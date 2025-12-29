@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Productive Habit Tracker</title>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+
+  <style>
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background: #f2f2f7;
+    display: flex;
+    justify-content: center;
+    padding-top: 32px;
+  }
+
+  #app {
+    width: 100%;
+    max-width: 420px;
+    padding: 0 20px;
+  }
+
+  h1 {
+    text-align: center;
+    font-size: 28px;
+    font-weight: 700;
+    color: #1c1c1e;
+    margin-bottom: 24px;
+  }
+
+  form {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+
+  input {
+    flex: 1;
+    padding: 12px 14px;
+    border-radius: 12px;
+    border: 1px solid #d1d1d6;
+    font-size: 16px;
+    background: white;
+    outline: none;
+    transition: border 0.2s;
+  }
+
+  input:focus {
+    border-color: #007aff;
+  }
+
+  button {
+    padding: 12px 16px;
+    border-radius: 12px;
+    border: none;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    background: #007aff;
+    color: white;
+    transition: background 0.2s;
+  }
+
+  button:hover {
+    background: #005fcc;
+  }
+
+  .habits {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .habit {
+    background: white;
+    border-radius: 16px;
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.04);
+  }
+
+  .info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .info h3 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: #000;
+  }
+
+  .info span {
+    font-size: 13px;
+    color: #6e6e73;
+  }
+
+  .check {
+    padding: 10px 14px;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 600;
+    border: 2px solid transparent;
+    background: #e5e5ea;
+    color: #1c1c1e;
+    transition: all 0.2s;
+  }
+
+  .check.done {
+    background: #34c759;
+    border-color: #34c759;
+    color: white;
+  }
+
+  .check:hover {
+    background: #d6d6db;
+  }
+
+  .delete {
+    background: transparent;
+    font-size: 20px;
+    color: #ff3b30;
+    line-height: 1;
+    padding: 6px;
+  }
+
+  .delete:hover {
+    opacity: 0.7;
+  }
+</style>
+
+</head>
+
+<body>
+  <div id="app">
+    <h1>🐾 Productive Habit Tracker</h1>
+
+    <form @submit.prevent="addHabit">
+      <input v-model="newHabit" placeholder="New habit..." />
+      <button>Add</button>
+    </form>
+
+    <div class="habits">
+      <div class="habit" v-for="habit in habits" :key="habit.id">
+        <div class="info">
+          <h3>{{ habit.name }}</h3>
+          <span>🔥 {{ streak(habit) }} day streak</span>
+        </div>
+
+        <button
+          class="check"
+          :class="{ done: isDoneToday(habit) }"
+          @click="toggleToday(habit)"
+        >
+          {{ isDoneToday(habit) ? '✓ Done' : 'Mark Done' }}
+        </button>
+
+        <button class="delete" @click="removeHabit(habit.id)">✕</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const { createApp, ref, watch } = Vue
+
+    createApp({
+      setup() {
+        const today = () => new Date().toISOString().slice(0, 10)
+
+        const habits = ref(
+          JSON.parse(localStorage.getItem('habits')) || []
+        )
+
+        const newHabit = ref('')
+
+        watch(habits, () => {
+          localStorage.setItem('habits', JSON.stringify(habits.value))
+        }, { deep: true })
+
+        function addHabit() {
+          if (!newHabit.value.trim()) return
+          habits.value.push({
+            id: Date.now(),
+            name: newHabit.value,
+            days: {}
+          })
+          newHabit.value = ''
+        }
+
+        function removeHabit(id) {
+          habits.value = habits.value.filter(h => h.id !== id)
+        }
+
+        function toggleToday(habit) {
+          const d = today()
+          habit.days[d] = !habit.days[d]
+        }
+
+        function isDoneToday(habit) {
+          return habit.days[today()] === true
+        }
+
+        function streak(habit) {
+          let count = 0
+          let d = new Date()
+
+          while (true) {
+            const key = d.toISOString().slice(0, 10)
+            if (!habit.days[key]) break
+            count++
+            d.setDate(d.getDate() - 1)
+          }
+          return count
+        }
+
+        return {
+          habits,
+          newHabit,
+          addHabit,
+          removeHabit,
+          toggleToday,
+          isDoneToday,
+          streak
+        }
+      }
+    }).mount('#app')
+  </script>
+</body>
+</html>
