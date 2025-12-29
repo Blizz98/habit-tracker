@@ -2,186 +2,833 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Productive Habit Tracker</title>
+  <title>Be Productive!</title>
   <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <link rel="apple-touch-icon" href="https://icon-library.com/images/habit-icon/habit-icon-13.jpg">
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <style>
+  * {
+    box-sizing: border-box;
+  }
+
   body {
     margin: 0;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    background: #f2f2f7;
-    display: flex;
-    justify-content: center;
-    padding-top: 32px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    padding: 20px;
   }
 
   #app {
-    width: 100%;
-    max-width: 420px;
-    padding: 0 20px;
+    max-width: 480px;
+    margin: 0 auto;
   }
 
-  h1 {
+  .header {
     text-align: center;
-    font-size: 28px;
-    font-weight: 700;
-    color: #1c1c1e;
-    margin-bottom: 24px;
+    color: white;
+    margin-bottom: 32px;
   }
 
-  form {
-    display: flex;
+  .header h1 {
+    font-size: 32px;
+    font-weight: 700;
+    margin: 0 0 8px 0;
+  }
+
+  .header .date {
+    font-size: 16px;
+    opacity: 0.9;
+  }
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
     gap: 12px;
     margin-bottom: 24px;
   }
 
-  input {
-    flex: 1;
-    padding: 12px 14px;
-    border-radius: 12px;
-    border: 1px solid #d1d1d6;
-    font-size: 16px;
+  .stat-card {
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 16px;
+    padding: 16px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .stat-card:hover {
     background: white;
+    transform: translateY(-2px);
+  }
+
+  .stat-card .number {
+    font-size: 28px;
+    font-weight: 700;
+    color: #667eea;
+    display: block;
+  }
+
+  .stat-card .label {
+    font-size: 12px;
+    color: #666;
+    margin-top: 4px;
+    display: block;
+  }
+
+  .menu{
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .calendar-button {
+    background: transparent;
+    border-radius: 16px;
+    padding: 16px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: none;
+    width: fit-content;
+    font-family: inherit;
+    position:fixed;
+    bottom: 0;
+    left: auto;
+    right: auto;
+  }
+
+  .calendar-button:hover {
+    background: white;
+    transform: translateY(-2px);
+  }
+
+  .calendar-button .icon {
+    width: 64px;
+    height: 64px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #4caf50 0%, #2e7d32 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 20px;
+  }
+
+  .calendar-button .text {
+    flex: 1;
+    font-size: 16px;
+    color: #333;
+    font-weight: 500;
+    text-align: left;
+  }
+
+  .calendar-view {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    z-index: 1000;
+    animation: fadeIn 0.2s;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes slideUp {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+
+  .calendar-content {
+    background: white;
+    border-radius: 20px 20px 0 0;
+    width: 100%;
+    max-width: 480px;
+    max-height: 80vh;
+    overflow-y: auto;
+    animation: slideUp 0.3s;
+  }
+
+  .calendar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    border-bottom: 1px solid #f0f0f0;
+    position: sticky;
+    top: 0;
+    background: white;
+    z-index: 10;
+  }
+
+  .calendar-header h2 {
+    margin: 0;
+    font-size: 20px;
+    color: #333;
+    font-weight: 600;
+  }
+
+  .close-button {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: none;
+    background: #f0f0f0;
+    color: #666;
+    font-size: 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+  }
+
+  .close-button:hover {
+    background: #e0e0e0;
+  }
+
+  .calendar-body {
+    padding: 20px;
+  }
+
+  .month-nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+  }
+
+  .month-nav button {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    border: none;
+    background: #f0f0f0;
+    color: #666;
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+  }
+
+  .month-nav button:hover {
+    background: #e0e0e0;
+  }
+
+  .calendar-month-label {
+    font-size: 16px;
+    color: #333;
+    font-weight: 600;
+  }
+
+  .calendar-weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .calendar-weekday {
+    text-align: center;
+    font-size: 11px;
+    color: #999;
+    font-weight: 600;
+    padding: 4px 0;
+  }
+
+  .calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 8px;
+  }
+
+  .calendar-day {
+    aspect-ratio: 1;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 500;
+    position: relative;
+    transition: all 0.2s;
+  }
+
+  .calendar-day.empty {
+    opacity: 0;
+  }
+
+  .calendar-day.other-month {
+    opacity: 0.3;
+  }
+
+  .calendar-day.today {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    font-weight: 700;
+  }
+
+  .calendar-day.has-completion {
+    background: #e8f5e9;
+    color: #ffffff;
+  }
+
+  .calendar-day.full-completion {
+    background: linear-gradient(135deg, #4caf50 0%, #2e7d32 100%);
+    color: white;
+    font-weight: 700;
+  }
+
+  .calendar-day.has-completion.today {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  }
+
+  .calendar-day.full-completion.today {
+    background: linear-gradient(135deg, #4caf50 0%, #2e7d32 100%);
+  }
+
+  .completion-indicator {
+    position: absolute;
+    bottom: 2px;
+    font-size: 10px;
+    font-weight: 600;
+    opacity: 0.8;
+  }
+
+  .add-habit {
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 16px;
+    padding: 16px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .add-habit:hover {
+    background: white;
+    transform: translateY(-2px);
+  }
+
+  .add-habit .icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 24px;
+  }
+
+  .add-habit .text {
+    flex: 1;
+    font-size: 16px;
+    color: #333;
+    font-weight: 500;
+  }
+
+  .modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 1000;
+  }
+
+  .modal-content {
+    background: white;
+    border-radius: 20px;
+    padding: 24px;
+    width: 100%;
+    max-width: 400px;
+  }
+
+  .modal-content h2 {
+    margin: 0 0 20px 0;
+    font-size: 24px;
+    color: #333;
+  }
+
+  .modal-content input {
+    width: 100%;
+    padding: 14px;
+    border-radius: 12px;
+    border: 2px solid #e0e0e0;
+    font-size: 16px;
+    margin-bottom: 16px;
     outline: none;
     transition: border 0.2s;
   }
 
-  input:focus {
-    border-color: #007aff;
+  .modal-content input:focus {
+    border-color: #667eea;
   }
 
-  button {
-    padding: 12px 16px;
+  .modal-buttons {
+    display: flex;
+    gap: 12px;
+  }
+
+  .modal-buttons button {
+    flex: 1;
+    padding: 14px;
     border-radius: 12px;
     border: none;
+    font-size: 16px;
     font-weight: 600;
-    font-size: 14px;
     cursor: pointer;
-    background: #007aff;
-    color: white;
-    transition: background 0.2s;
+    transition: all 0.2s;
   }
 
-  button:hover {
-    background: #005fcc;
+  .btn-cancel {
+    background: #f0f0f0;
+    color: #666;
+  }
+
+  .btn-cancel:hover {
+    background: #e0e0e0;
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+  }
+
+  .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
   }
 
   .habits {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 12px;
   }
 
   .habit {
-    background: white;
+    background: rgba(255, 255, 255, 0.95);
     border-radius: 16px;
     padding: 16px;
     display: flex;
     align-items: center;
     gap: 12px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.04);
-  }
-
-  .info {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-
-  .info h3 {
-    margin: 0;
-    font-size: 18px;
-    font-weight: 600;
-    color: #000;
-  }
-
-  .info span {
-    font-size: 13px;
-    color: #6e6e73;
-  }
-
-  .check {
-    padding: 10px 14px;
-    border-radius: 12px;
-    font-size: 14px;
-    font-weight: 600;
-    border: 2px solid transparent;
-    background: #e5e5ea;
-    color: #1c1c1e;
     transition: all 0.2s;
   }
 
-  .check.done {
-    background: #34c759;
-    border-color: #34c759;
+  .habit:hover {
+    background: white;
+    transform: translateY(-2px);
+  }
+
+  .habit-check {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: 3px solid #e0e0e0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s;
+    flex-shrink: 0;
+  }
+
+  .habit-check.done {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-color: #667eea;
+  }
+
+  .habit-check .checkmark {
+    color: white;
+    font-size: 24px;
+    font-weight: bold;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .habit-check.done .checkmark {
+    opacity: 1;
+  }
+
+  .habit-info {
+    flex: 1;
+  }
+
+  .habit-info h3 {
+    margin: 0 0 4px 0;
+    font-size: 17px;
+    font-weight: 600;
+    color: #333;
+  }
+
+  .habit-info .streak {
+    font-size: 13px;
+    color: #999;
+  }
+
+  .habit-info .streak .fire {
+    color: #ff6b6b;
+  }
+
+  .habit-delete {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: none;
+    background: transparent;
+    color: #999;
+    font-size: 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+  }
+
+  .habit-delete:hover {
+    background: #fee;
+    color: #f44336;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
     color: white;
   }
 
-  .check:hover {
-    background: #d6d6db;
+  .empty-state .emoji {
+    font-size: 64px;
+    margin-bottom: 16px;
   }
 
-  .delete {
-    background: transparent;
+  .empty-state h3 {
     font-size: 20px;
-    color: #ff3b30;
-    line-height: 1;
-    padding: 6px;
+    margin: 0 0 8px 0;
   }
 
-  .delete:hover {
-    opacity: 0.7;
+  .empty-state p {
+    font-size: 14px;
+    opacity: 0.8;
+    margin: 0;
   }
-</style>
 
+  @media (max-width: 480px) {
+    body {
+      padding: 16px;
+    }
+
+    .header h1 {
+      font-size: 28px;
+    }
+
+    .stats {
+      gap: 8px;
+    }
+
+    .stat-card {
+      padding: 12px;
+    }
+
+    .stat-card .number {
+      font-size: 24px;
+    }
+
+    .calendar-content {
+      max-height: 85vh;
+    }
+
+    .calendar-body {
+      padding: 16px;
+    }
+
+    .calendar-grid {
+      gap: 6px;
+    }
+
+    .calendar-day {
+      font-size: 12px;
+    }
+  }
+  </style>
 </head>
 
 <body>
   <div id="app">
-    <h1>🐾 Productive Habit Tracker</h1>
+    <div class="header">
+      <h1>Be Productive!</h1>
+      <div class="date">{{ currentDate }}</div>
+    </div>
+    <div class="menu">
+      <button class="calendar-button" @click="showCalendar = true">
+        <div class="icon">📅</div>
+        <!-- <div class="text">Calendar</div> -->
+      </button>
+    </div>
 
-    <form @submit.prevent="addHabit">
-      <input v-model="newHabit" placeholder="New habit..." />
-      <button>Add</button>
-    </form>
+    <div class="stats">
+      <div class="stat-card">
+        <span class="number">{{ todayCompleted }}</span>
+        <span class="label">Today</span>
+      </div>
+      <div class="stat-card">
+        <span class="number">{{ totalHabits }}</span>
+        <span class="label">Habits</span>
+      </div>
+      <div class="stat-card">
+        <span class="number">{{ bestStreak }}</span>
+        <span class="label">Best Streak</span>
+      </div>
+    </div>
 
-    <div class="habits">
+    <div class="add-habit" @click="showModal = true">
+      <div class="icon">+</div>
+      <div class="text">Add new habit</div>
+    </div>
+
+    <div class="habits" v-if="habits.length > 0">
       <div class="habit" v-for="habit in habits" :key="habit.id">
-        <div class="info">
+        <div class="habit-check" :class="{ done: isDoneToday(habit) }" @click="toggleToday(habit)">
+          <span class="checkmark">✓</span>
+        </div>
+        
+        <div class="habit-info">
           <h3>{{ habit.name }}</h3>
-          <span>🔥 {{ streak(habit) }} day streak</span>
+          <div class="streak">
+            <span class="fire">🔥</span> {{ streak(habit) }} day streak
+          </div>
         </div>
 
-        <button
-          class="check"
-          :class="{ done: isDoneToday(habit) }"
-          @click="toggleToday(habit)"
-        >
-          {{ isDoneToday(habit) ? '✓ Done' : 'Mark Done' }}
-        </button>
+        <button class="habit-delete" @click="removeHabit(habit.id)">×</button>
+      </div>
+    </div>
 
-        <button class="delete" @click="removeHabit(habit.id)">✕</button>
+    <div class="empty-state" v-else>
+      <div class="emoji">🎯</div>
+      <h3>No habits yet</h3>
+      <p>Add your first habit to get started</p>
+    </div>
+
+    <!-- Calendar View -->
+    <div class="calendar-view" v-if="showCalendar" @click.self="showCalendar = false">
+      <div class="calendar-content">
+        <div class="calendar-header">
+          <h2>Progress Calendar</h2>
+          <button class="close-button" @click="showCalendar = false">×</button>
+        </div>
+        
+        <div class="calendar-body">
+          <div class="month-nav">
+            <button @click="previousMonth">‹</button>
+            <div class="calendar-month-label">{{ calendarMonthLabel }}</div>
+            <button @click="nextMonth">›</button>
+          </div>
+          
+          <div class="calendar-weekdays">
+            <div class="calendar-weekday">S</div>
+            <div class="calendar-weekday">M</div>
+            <div class="calendar-weekday">T</div>
+            <div class="calendar-weekday">W</div>
+            <div class="calendar-weekday">T</div>
+            <div class="calendar-weekday">F</div>
+            <div class="calendar-weekday">S</div>
+          </div>
+          
+          <div class="calendar-grid">
+            <div 
+              v-for="day in calendarDays" 
+              :key="day.key"
+              class="calendar-day"
+              :class="{
+                'empty': day.empty,
+                'other-month': day.otherMonth,
+                'today': day.isToday,
+                'has-completion': day.completionRate > 0 && day.completionRate < 1,
+                'full-completion': day.completionRate === 1
+              }"
+            >
+              <span v-if="!day.empty">{{ day.day }}</span>
+              <span class="completion-indicator" v-if="day.completionRate > 0 && !day.empty">
+                {{ day.completed }}/{{ day.total }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Add Habit Modal -->
+    <div class="modal" v-if="showModal" @click.self="showModal = false">
+      <div class="modal-content">
+        <h2>New Habit</h2>
+        <input 
+          v-model="newHabit" 
+          placeholder="Enter habit name..." 
+          @keyup.enter="addHabit"
+          ref="habitInput"
+        />
+        <div class="modal-buttons">
+          <button class="btn-cancel" @click="showModal = false">Cancel</button>
+          <button class="btn-primary" @click="addHabit">Add Habit</button>
+        </div>
       </div>
     </div>
   </div>
 
   <script>
-    const { createApp, ref, watch } = Vue
+    const { createApp, ref, computed, watch, nextTick } = Vue
 
     createApp({
       setup() {
         const today = () => new Date().toISOString().slice(0, 10)
 
-        const habits = ref(
-          JSON.parse(localStorage.getItem('habits')) || []
-        )
-
+        const habits = ref([])
         const newHabit = ref('')
+        const showModal = ref(false)
+        const showCalendar = ref(false)
+        const habitInput = ref(null)
+        const calendarMonth = ref(new Date())
 
+        // Load from storage
+        try {
+          const stored = window.storage ? null : localStorage.getItem('habits')
+          if (stored) {
+            habits.value = JSON.parse(stored)
+          }
+        } catch (e) {
+          console.log('Storage not available')
+        }
+
+        // Watch for modal open to focus input
+        watch(showModal, async (isOpen) => {
+          if (isOpen) {
+            await nextTick()
+            habitInput.value?.focus()
+          }
+        })
+
+        // Save to storage
         watch(habits, () => {
-          localStorage.setItem('habits', JSON.stringify(habits.value))
+          try {
+            if (!window.storage) {
+              localStorage.setItem('habits', JSON.stringify(habits.value))
+            }
+          } catch (e) {
+            console.log('Storage not available')
+          }
         }, { deep: true })
+
+        const currentDate = computed(() => {
+          const date = new Date()
+          return date.toLocaleDateString('en-US', { 
+            weekday: 'long', 
+            month: 'long', 
+            day: 'numeric' 
+          })
+        })
+
+        const calendarMonthLabel = computed(() => {
+          return calendarMonth.value.toLocaleDateString('en-US', {
+            month: 'long',
+            year: 'numeric'
+          })
+        })
+
+        const calendarDays = computed(() => {
+          const year = calendarMonth.value.getFullYear()
+          const month = calendarMonth.value.getMonth()
+          
+          const firstDay = new Date(year, month, 1)
+          const lastDay = new Date(year, month + 1, 0)
+          const startingDayOfWeek = firstDay.getDay()
+          const daysInMonth = lastDay.getDate()
+          
+          const days = []
+          
+          // Add empty cells for days before month starts
+          for (let i = 0; i < startingDayOfWeek; i++) {
+            days.push({ empty: true, key: `empty-${i}` })
+          }
+          
+          // Add days of the month
+          for (let day = 1; day <= daysInMonth; day++) {
+            const date = new Date(year, month, day)
+            const dateStr = date.toISOString().slice(0, 10)
+            const isToday = dateStr === today()
+            
+            let completed = 0
+            let total = habits.value.length
+            
+            habits.value.forEach(habit => {
+              if (habit.days[dateStr]) {
+                completed++
+              }
+            })
+            
+            const completionRate = total > 0 ? completed / total : 0
+            
+            days.push({
+              day,
+              date: dateStr,
+              isToday,
+              completed,
+              total,
+              completionRate,
+              empty: false,
+              otherMonth: false,
+              key: dateStr
+            })
+          }
+          
+          return days
+        })
+
+        const todayCompleted = computed(() => {
+          return habits.value.filter(h => isDoneToday(h)).length
+        })
+
+        const totalHabits = computed(() => habits.value.length)
+
+        const bestStreak = computed(() => {
+          if (habits.value.length === 0) return 0
+          return Math.max(...habits.value.map(h => streak(h)))
+        })
+
+        function previousMonth() {
+          const newDate = new Date(calendarMonth.value)
+          newDate.setMonth(newDate.getMonth() - 1)
+          calendarMonth.value = newDate
+        }
+
+        function nextMonth() {
+          const newDate = new Date(calendarMonth.value)
+          newDate.setMonth(newDate.getMonth() + 1)
+          calendarMonth.value = newDate
+        }
 
         function addHabit() {
           if (!newHabit.value.trim()) return
@@ -191,6 +838,7 @@
             days: {}
           })
           newHabit.value = ''
+          showModal.value = false
         }
 
         function removeHabit(id) {
@@ -222,6 +870,18 @@
         return {
           habits,
           newHabit,
+          showModal,
+          showCalendar,
+          habitInput,
+          calendarMonth,
+          currentDate,
+          calendarMonthLabel,
+          calendarDays,
+          todayCompleted,
+          totalHabits,
+          bestStreak,
+          previousMonth,
+          nextMonth,
           addHabit,
           removeHabit,
           toggleToday,
