@@ -28,7 +28,6 @@
   .header {
     text-align: center;
     color: white;
-    margin-bottom: 32px;
   }
 
   .header h1 {
@@ -78,17 +77,32 @@
   }
 
   .menu{
+    position: fixed;
     width: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
+    bottom: 0;
+    left:0;
+    right: 0;
+    background-color:#22093ff5;
+    border-top-left-radius: 50px;
+    border-top-right-radius: 50px;
+  }
+  .menu_items{
+    width: 100%;
+    display: flex;
+    position: relative;
+    padding: 0 16px;
   }
 
   .calendar-button {
     background: transparent;
     border-radius: 16px;
+    border-top-left-radius: 50px;
+    border-top-right-radius: 50px;
     padding: 16px;
-    margin-bottom: 16px;
+    /* margin-bottom: 16px; */
     display: flex;
     align-items: center;
     gap: 12px;
@@ -97,10 +111,6 @@
     border: none;
     width: fit-content;
     font-family: inherit;
-    position:fixed;
-    bottom: 0;
-    left: auto;
-    right: auto;
   }
 
   .calendar-button:hover {
@@ -112,6 +122,8 @@
     width: 64px;
     height: 64px;
     border-radius: 12px;
+    border-top-left-radius: 50px;
+    border-top-right-radius: 50px;
     background: linear-gradient(135deg, #4caf50 0%, #2e7d32 100%);
     display: flex;
     align-items: center;
@@ -311,32 +323,36 @@
   }
 
   .add-habit {
-    background: rgba(255, 255, 255, 0.95);
+    /* background: rgba(255, 255, 255, 0.95); */
     border-radius: 16px;
     padding: 16px;
-    margin-bottom: 16px;
+    /* margin-bottom: 16px; */
     display: flex;
     align-items: center;
     gap: 12px;
     cursor: pointer;
     transition: all 0.2s;
+    position: absolute;
+    top: -45px;
+    left: 34%;
   }
 
   .add-habit:hover {
-    background: white;
+    /* background: white; */
     transform: translateY(-2px);
   }
 
   .add-habit .icon {
-    width: 40px;
-    height: 40px;
-    border-radius: 12px;
+    width: 96px;
+    height: 96px;
+    border-radius: 50%;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     display: flex;
-    align-items: center;
     justify-content: center;
     color: white;
-    font-size: 24px;
+    font-size: 64px;
+    box-shadow: 0px 10px 15px rgba(0, 0, 0, 0.498);
+    text-shadow: 0px 4px 8px rgba(0, 0, 0, 0.592);
   }
 
   .add-habit .text {
@@ -428,6 +444,7 @@
     display: flex;
     flex-direction: column;
     gap: 12px;
+    padding-bottom: 90px;
   }
 
   .habit {
@@ -464,15 +481,16 @@
   }
 
   .habit-check .checkmark {
-    color: white;
+    color: rgb(213, 213, 213);
     font-size: 24px;
     font-weight: bold;
-    opacity: 0;
+    opacity: 1;
     transition: opacity 0.3s;
   }
 
   .habit-check.done .checkmark {
     opacity: 1;
+    color:white;
   }
 
   .habit-info {
@@ -536,6 +554,55 @@
     opacity: 0.8;
     margin: 0;
   }
+  .calendar-carousel {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 12px 4px 4px;
+  margin-bottom: 32px;
+  scrollbar-width: none;
+}
+.calendar-carousel::-webkit-scrollbar {
+  display: none;
+}
+
+.carousel-day {
+  min-width: 56px;
+  height: 72px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #ca4848 0%, #851616 100%);
+  text-align: center;
+  padding: 8px 6px;
+  flex-shrink: 0;
+  transition: transform 0.2s;
+}
+
+.carousel-day.today {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  outline: 2px solid white;
+  color: white;
+  font-weight: 700;
+}
+
+.carousel-day.complete {
+  background: linear-gradient(135deg, #4caf50 0%, #2e7d32 100%);
+  color: white;
+}
+
+.carousel-day.partial {
+  background: linear-gradient(135deg, #b5a335 0%, #706415 100%)
+}
+
+.carousel-day .weekday {
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+.carousel-day .day {
+  font-size: 20px;
+  margin-top: 4px;
+}
+
 
   @media (max-width: 480px) {
     body {
@@ -584,12 +651,33 @@
       <div class="date">{{ currentDate }}</div>
     </div>
     <div class="menu">
-      <button class="calendar-button" @click="showCalendar = true">
-        <div class="icon">📅</div>
-        <!-- <div class="text">Calendar</div> -->
-      </button>
-    </div>
+      <div class="menu_items">
+        <button class="calendar-button" @click="showCalendar = true">
+          <div class="icon">📅</div>
+          <!-- <div class="text">Calendar</div> -->
+        </button>
+        <div class="add-habit" @click="showModal = true">
+          <div class="icon">+</div>
+          <!-- <div class="text">Add new habit</div> -->
+        </div>
+      </div>
 
+    </div>
+    <div class="calendar-carousel">
+    <div
+      v-for="day in carouselDays"
+      :key="day.date"
+      class="carousel-day"
+      :class="{
+        today: day.isToday,
+        complete: day.completionRate === 1,
+        partial: day.completionRate > 0 && day.completionRate < 1
+      }"
+    >
+      <div class="weekday">{{ day.weekday }}</div>
+      <div class="day">{{ day.day }}</div>
+    </div>
+  </div>
     <div class="stats">
       <div class="stat-card">
         <span class="number">{{ todayCompleted }}</span>
@@ -605,10 +693,10 @@
       </div>
     </div>
 
-    <div class="add-habit" @click="showModal = true">
+    <!-- <div class="add-habit" @click="showModal = true">
       <div class="icon">+</div>
       <div class="text">Add new habit</div>
-    </div>
+    </div> -->
 
     <div class="habits" v-if="habits.length > 0">
       <div class="habit" v-for="habit in habits" :key="habit.id">
@@ -807,6 +895,34 @@
           return days
         })
 
+        const carouselDays = computed(() => {
+          const days = []
+          const base = new Date()
+
+          for (let i = -14; i <= 0; i++) {
+            const d = new Date(base)
+            d.setDate(d.getDate() + i)
+            const key = d.toISOString().slice(0, 10)
+            console.log(key);
+
+            let completed = 0
+            habits.value.forEach(h => {
+              if (h.days[key]) completed++
+            })
+
+            days.push({
+              date: key,
+              day: d.getDate(),
+              weekday: d.toLocaleDateString('en-US', { weekday: 'short' }),
+              isToday: key === today(),
+              completionRate: habits.value.length
+                ? completed / habits.value.length
+                : 0
+            })
+          }
+          return days
+        })
+
         const todayCompleted = computed(() => {
           return habits.value.filter(h => isDoneToday(h)).length
         })
@@ -877,6 +993,7 @@
           currentDate,
           calendarMonthLabel,
           calendarDays,
+          carouselDays,
           todayCompleted,
           totalHabits,
           bestStreak,
