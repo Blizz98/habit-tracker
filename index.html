@@ -34,6 +34,28 @@
       </div>
     </div>
 
+    <!-- Category Filter -->
+    <div class="category-filter" v-if="habits.length > 0">
+      <button 
+        class="filter-btn" 
+        :class="{ active: selectedCategory === null }"
+        @click="selectedCategory = null"
+      >
+        Vše
+      </button>
+      <button 
+        v-for="category in categories" 
+        :key="category.id"
+        class="filter-btn"
+        :class="{ active: selectedCategory === category.id }"
+        :style="{ '--category-color': category.color }"
+        @click="selectedCategory = category.id"
+      >
+        <span class="filter-dot" :style="{ background: category.color }"></span>
+        {{ category.name }}
+      </button>
+    </div>
+
     <!-- Statistics Cards -->
     <div class="stats">
       <div class="stat-card">
@@ -51,10 +73,10 @@
     </div>
 
     <!-- Habits List -->
-    <div class="habits" v-if="habits.length > 0">
+    <div class="habits" v-if="filteredHabits.length > 0">
       <div 
         class="habit" 
-        v-for="(habit, index) in habits" 
+        v-for="(habit, index) in filteredHabits" 
         :key="habit.id" 
         :class="{ 
           'habit-inactive': !isHabitActiveToday(habit),
@@ -68,6 +90,13 @@
         @touchmove="onTouchMove($event)"
         @touchend="onTouchEnd"
       >
+        <!-- Category Indicator -->
+        <div 
+          class="habit-category-indicator" 
+          v-if="habit.categoryId"
+          :style="{ background: getCategoryColor(habit.categoryId) }"
+        ></div>
+
         <!-- Drag Handle -->
         <div class="habit-drag-handle">
           <span>⋮⋮</span>
@@ -96,33 +125,46 @@
           </div>
         </div>
 
-        <!-- Habit Check Button -->
-        <div 
-          class="habit-check" 
-          :class="{ 
-            partial: getCompletionCount(habit) > 0 && getCompletionCount(habit) < habit.dailyGoal,
-            done: isFullyDoneToday(habit) 
-          }"
-          :style="{ '--progress': getProgressPercent(habit) }"
-          @click="toggleToday(habit)"
-          v-if="isHabitActiveToday(habit)"
-        >
-          <span class="checkmark">✓</span>
-        </div>
-        <div class="habit-check" v-else style="opacity: 0.3; pointer-events: none;">
-          <span class="checkmark">—</span>
-        </div>
+        <!-- Actions Container -->
+        <div class="habit-actions">
+          <!-- Habit Check Button -->
+          <div 
+            class="habit-check" 
+            :class="{ 
+              partial: getCompletionCount(habit) > 0 && getCompletionCount(habit) < habit.dailyGoal,
+              done: isFullyDoneToday(habit) 
+            }"
+            :style="{ '--progress': getProgressPercent(habit) }"
+            @click="toggleToday(habit)"
+            v-if="isHabitActiveToday(habit)"
+          >
+            <span class="checkmark">✓</span>
+          </div>
+          <div class="habit-check" v-else style="opacity: 0.3; pointer-events: none;">
+            <span class="checkmark">—</span>
+          </div>
 
-        <!-- Delete Button -->
-        <button class="habit-delete" @click="removeHabit(habit)">×</button>
+          <!-- Action Buttons (Edit & Delete) -->
+          <div class="habit-action-buttons">
+            <button class="habit-edit" @click="openEditModal(habit)">✎</button>
+            <button class="habit-delete" @click="removeHabit(habit)">×</button>
+          </div>
+        </div>
       </div>
     </div>
 
     <!-- Empty State -->
-    <div class="empty-state" v-else>
+    <div class="empty-state" v-else-if="habits.length === 0">
       <span class="emoji">🎯</span>
       <h3>Žádné zvyky</h3>
       <p>Přidej svůj první zvyk a začni!</p>
+    </div>
+
+    <!-- Empty Filter State -->
+    <div class="empty-state" v-else>
+      <span class="emoji">🔍</span>
+      <h3>Žádné zvyky v této kategorii</h3>
+      <p>Vyber jinou kategorii nebo přidej nový zvyk</p>
     </div>
 
     <!-- Bottom Navigation -->
@@ -215,6 +257,87 @@
           <button class="close-button" @click="showSettings = false">×</button>
         </div>
         <div class="settings-body">
+          <!-- Analytics Section -->
+          <div class="settings-section">
+            <div class="settings-section-title">Analýza</div>
+            
+            <!-- Weekly Chart -->
+            <div class="analytics-card">
+              <h4>Týdenní přehled</h4>
+              <div class="weekly-chart">
+                <div 
+                  class="weekly-bar" 
+                  v-for="(data, index) in weeklyAnalytics" 
+                  :key="index"
+                  :class="{ today: data.isToday }"
+                >
+                  <div class="bar-fill" :style="{ height: data.percentage + '%' }"></div>
+                  <span class="bar-label">{{ data.day }}</span>
+                  <span class="bar-value">{{ data.percentage }}%</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Key Metrics -->
+            <div class="analytics-metrics">
+              <div class="metric-card">
+                <span class="metric-icon">📈</span>
+                <div class="metric-info">
+                  <span class="metric-value" :class="{ positive: completionTrend > 0, negative: completionTrend < 0 }">
+                    {{ completionTrend > 0 ? '+' : '' }}{{ completionTrend }}%
+                  </span>
+                  <span class="metric-label">Trend (7 dní)</span>
+                </div>
+              </div>
+              <div class="metric-card">
+                <span class="metric-icon">⭐</span>
+                <div class="metric-info">
+                  <span class="metric-value">{{ bestDayOfWeek }}</span>
+                  <span class="metric-label">Nejlepší den</span>
+                </div>
+              </div>
+              <div class="metric-card">
+                <span class="metric-icon">📊</span>
+                <div class="metric-info">
+                  <span class="metric-value">{{ averageCompletionRate }}%</span>
+                  <span class="metric-label">Průměr (30 dní)</span>
+                </div>
+              </div>
+              <div class="metric-card">
+                <span class="metric-icon">🎯</span>
+                <div class="metric-info">
+                  <span class="metric-value">{{ perfectDays }}</span>
+                  <span class="metric-label">Perfektní dny</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Category Breakdown -->
+            <div class="analytics-card" v-if="categoryBreakdown.length > 0">
+              <h4>Podle kategorií</h4>
+              <div class="category-breakdown">
+                <div 
+                  class="category-stat" 
+                  v-for="cat in categoryBreakdown" 
+                  :key="cat.id"
+                >
+                  <div class="category-stat-header">
+                    <span class="category-stat-dot" :style="{ background: cat.color }"></span>
+                    <span class="category-stat-name">{{ cat.name }}</span>
+                    <span class="category-stat-value">{{ cat.completionRate }}%</span>
+                  </div>
+                  <div class="category-stat-bar">
+                    <div 
+                      class="category-stat-fill" 
+                      :style="{ width: cat.completionRate + '%', background: cat.color }"
+                    ></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Overview Section -->
           <div class="settings-section">
             <div class="settings-section-title">Přehled</div>
             <div class="stats-grid">
@@ -236,6 +359,35 @@
               </div>
             </div>
           </div>
+
+          <!-- Categories Management -->
+          <div class="settings-section">
+            <div class="settings-section-title">
+              Kategorie
+              <button class="add-category-btn" @click="showCategoryModal = true">+ Přidat</button>
+            </div>
+            <div class="settings-item" v-for="category in categories" :key="category.id">
+              <div class="settings-item-left">
+                <div class="settings-item-icon" :style="{ background: category.color }"></div>
+                <div class="settings-item-text">
+                  <h4>{{ category.name }}</h4>
+                  <p>{{ getCategoryHabitCount(category.id) }} zvyků</p>
+                </div>
+              </div>
+              <button class="category-delete-btn" @click="deleteCategory(category.id)">×</button>
+            </div>
+            <div class="settings-item" v-if="categories.length === 0">
+              <div class="settings-item-left">
+                <div class="settings-item-icon">🏷️</div>
+                <div class="settings-item-text">
+                  <h4>Žádné kategorie</h4>
+                  <p>Přidej kategorii pro lepší organizaci</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Habits List -->
           <div class="settings-section">
             <div class="settings-section-title">Zvyky</div>
             <div class="settings-item" v-for="habit in habits" :key="habit.id">
@@ -294,6 +446,30 @@
         </div>
 
         <div class="form-group">
+          <label class="form-label">Kategorie</label>
+          <div class="category-selector">
+            <button 
+              class="category-option"
+              :class="{ selected: selectedCategoryId === null }"
+              @click="selectedCategoryId = null"
+            >
+              Žádná
+            </button>
+            <button 
+              v-for="category in categories" 
+              :key="category.id"
+              class="category-option"
+              :class="{ selected: selectedCategoryId === category.id }"
+              :style="{ '--cat-color': category.color }"
+              @click="selectedCategoryId = category.id"
+            >
+              <span class="category-option-dot" :style="{ background: category.color }"></span>
+              {{ category.name }}
+            </button>
+          </div>
+        </div>
+
+        <div class="form-group">
           <label class="form-label">Denní cíl</label>
           <div class="frequency-selector">
             <button class="frequency-btn" :class="{ active: dailyGoal === 1 }" @click="dailyGoal = 1">1×</button>
@@ -336,6 +512,42 @@
       </div>
     </div>
 
+    <!-- Add Category Modal -->
+    <div class="modal" v-if="showCategoryModal" @click.self="showCategoryModal = false">
+      <div class="modal-content modal-small">
+        <h2>🏷️ Nová kategorie</h2>
+        
+        <div class="form-group">
+          <label class="form-label">Název</label>
+          <input 
+            type="text" 
+            v-model="newCategoryName" 
+            placeholder="např. Zdraví, Práce..." 
+            @keyup.enter="addCategory"
+          />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Barva</label>
+          <div class="color-selector">
+            <button 
+              v-for="color in availableColors" 
+              :key="color"
+              class="color-option"
+              :class="{ selected: selectedColor === color }"
+              :style="{ background: color }"
+              @click="selectedColor = color"
+            ></button>
+          </div>
+        </div>
+
+        <div class="modal-buttons">
+          <button class="btn-cancel" @click="showCategoryModal = false">Zavřít</button>
+          <button class="btn-primary" @click="addCategory">Vytvořit</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Delete Confirmation Modal -->
     <div class="delete-modal" v-if="habitToDelete" @click.self="habitToDelete = null">
       <div class="delete-modal-content">
@@ -349,6 +561,102 @@
         <div class="delete-modal-buttons">
           <button class="btn-delete-cancel" @click="habitToDelete = null">Zrušit</button>
           <button class="btn-delete-confirm" @click="confirmDelete">Smazat</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Edit Habit Modal -->
+    <div class="modal" v-if="habitToEdit" @click.self="habitToEdit = null">
+      <div class="modal-content">
+        <h2>✏️ Upravit zvyk</h2>
+        
+        <div class="form-group">
+          <label class="form-label">Název</label>
+          <input 
+            type="text" 
+            v-model="editForm.name" 
+            placeholder="např. Cvičit, Meditovat..."
+          />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Ikonka</label>
+          <div class="icon-selector">
+            <button 
+              v-for="icon in availableIcons" 
+              :key="icon" 
+              class="icon-option" 
+              :class="{ selected: editForm.icon === icon }" 
+              @click="editForm.icon = icon"
+            >
+              {{ icon }}
+            </button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Kategorie</label>
+          <div class="category-selector">
+            <button 
+              class="category-option"
+              :class="{ selected: editForm.categoryId === null }"
+              @click="editForm.categoryId = null"
+            >
+              Žádná
+            </button>
+            <button 
+              v-for="category in categories" 
+              :key="category.id"
+              class="category-option"
+              :class="{ selected: editForm.categoryId === category.id }"
+              :style="{ '--cat-color': category.color }"
+              @click="editForm.categoryId = category.id"
+            >
+              <span class="category-option-dot" :style="{ background: category.color }"></span>
+              {{ category.name }}
+            </button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Denní cíl</label>
+          <div class="frequency-selector">
+            <button class="frequency-btn" :class="{ active: editForm.dailyGoal === 1 }" @click="editForm.dailyGoal = 1">1×</button>
+            <button class="frequency-btn" :class="{ active: editForm.dailyGoal === 2 }" @click="editForm.dailyGoal = 2">2×</button>
+            <button class="frequency-btn" :class="{ active: editForm.dailyGoal === 3 }" @click="editForm.dailyGoal = 3">3×</button>
+          </div>
+          <div class="custom-frequency" v-if="editForm.dailyGoal > 3 || editShowCustom">
+            <input type="number" v-model.number="editForm.dailyGoal" min="1" max="20" />
+            <span>× denně</span>
+          </div>
+          <button 
+            v-if="editForm.dailyGoal <= 3 && !editShowCustom" 
+            class="frequency-btn" 
+            style="margin-top: 10px; width: 100%;" 
+            @click="editShowCustom = true; editForm.dailyGoal = 4"
+          >
+            Vlastní
+          </button>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Aktivní dny</label>
+          <div class="day-selector">
+            <button 
+              v-for="(dayName, index) in dayNames" 
+              :key="index" 
+              class="day-btn" 
+              :class="{ active: editForm.activeDays.includes(index) }" 
+              @click="toggleEditDay(index)"
+            >
+              {{ dayName }}
+            </button>
+          </div>
+        </div>
+
+        <div class="modal-buttons">
+          <button class="btn-cancel" @click="habitToEdit = null">Zrušit</button>
+          <button class="btn-primary" @click="saveHabitEdit">Uložit</button>
         </div>
       </div>
     </div>

@@ -6,21 +6,21 @@ createApp({
     // UTILITY FUNCTIONS
     // ============================================
     
-    /**
-     * Returns today's date as a string in YYYY-MM-DD format
-     * Uses local timezone to avoid UTC offset issues
-     */
     const today = () => {
       const d = new Date()
       return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    }
+
+    const getDateString = (date) => {
+      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
     }
 
     // ============================================
     // REACTIVE STATE
     // ============================================
     
-    // Core data
     const habits = ref([])
+    const categories = ref([])
     
     // New habit form state
     const newHabit = ref('')
@@ -29,14 +29,34 @@ createApp({
     const customGoal = ref(4)
     const showCustom = ref(false)
     const selectedDays = ref([0, 1, 2, 3, 4, 5, 6])
+    const selectedCategoryId = ref(null)
+    
+    // New category form state
+    const newCategoryName = ref('')
+    const selectedColor = ref('#667eea')
+    
+    // Filter state
+    const selectedCategory = ref(null)
     
     // Modal visibility states
     const showModal = ref(false)
     const showCalendar = ref(false)
     const showSettings = ref(false)
+    const showCategoryModal = ref(false)
     
     // Delete confirmation
     const habitToDelete = ref(null)
+    
+    // Edit habit state
+    const habitToEdit = ref(null)
+    const editShowCustom = ref(false)
+    const editForm = ref({
+      name: '',
+      icon: '💪',
+      dailyGoal: 1,
+      activeDays: [0, 1, 2, 3, 4, 5, 6],
+      categoryId: null
+    })
     
     // Template refs
     const habitInput = ref(null)
@@ -65,6 +85,7 @@ createApp({
     // ============================================
     
     const dayNames = ['Ne', 'Po', 'Út', 'St', 'Čt', 'Pá', 'So']
+    const dayNamesFull = ['Neděle', 'Pondělí', 'Úterý', 'Středa', 'Čtvrtek', 'Pátek', 'Sobota']
     
     const availableIcons = [
       '💪', '🏃', '📚', '🧘', '🎯', '💧',
@@ -75,22 +96,34 @@ createApp({
       '🧹', '🧺', '🍳', '🛒', '💰', '🎸'
     ]
 
+    const availableColors = [
+      '#667eea', '#764ba2', '#f59e0b', '#10b981', 
+      '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4',
+      '#84cc16', '#f97316', '#6366f1', '#14b8a6'
+    ]
+
     // ============================================
     // LOCAL STORAGE - LOAD
     // ============================================
     
     try {
-      const stored = localStorage.getItem('habits')
-      if (stored) {
-        habits.value = JSON.parse(stored).map(h => ({
+      const storedHabits = localStorage.getItem('habits')
+      if (storedHabits) {
+        habits.value = JSON.parse(storedHabits).map(h => ({
           ...h,
           dailyGoal: h.dailyGoal || 1,
           icon: h.icon || '⭐',
-          activeDays: h.activeDays || [0, 1, 2, 3, 4, 5, 6]
+          activeDays: h.activeDays || [0, 1, 2, 3, 4, 5, 6],
+          categoryId: h.categoryId || null
         }))
       }
+      
+      const storedCategories = localStorage.getItem('categories')
+      if (storedCategories) {
+        categories.value = JSON.parse(storedCategories)
+      }
     } catch (e) {
-      console.log('Could not load habits from localStorage')
+      console.log('Could not load data from localStorage')
     }
 
     // ============================================
@@ -119,6 +152,14 @@ createApp({
         showCustom.value = false
         customGoal.value = 4
         selectedDays.value = [0, 1, 2, 3, 4, 5, 6]
+        selectedCategoryId.value = null
+      }
+    })
+
+    watch(showCategoryModal, (isOpen) => {
+      if (isOpen) {
+        newCategoryName.value = ''
+        selectedColor.value = availableColors[0]
       }
     })
 
@@ -130,19 +171,19 @@ createApp({
       }
     }, { deep: true })
 
+    watch(categories, () => {
+      try {
+        localStorage.setItem('categories', JSON.stringify(categories.value))
+      } catch (e) {
+        console.log('Could not save categories to localStorage')
+      }
+    }, { deep: true })
+
     // ============================================
     // TOAST FUNCTIONS
     // ============================================
 
-    /**
-     * Show a toast notification
-     * @param {string} message - Message to display
-     * @param {string} icon - Emoji icon
-     * @param {string} type - Toast type (success, streak, complete)
-     * @param {number} duration - Duration in ms
-     */
     function showToast(message, icon, type = 'success', duration = 2500) {
-      // Clear any existing timeout
       if (toastTimeout) {
         clearTimeout(toastTimeout)
       }
@@ -159,48 +200,31 @@ createApp({
       }, duration)
     }
 
-    /**
-     * Generate appropriate toast message based on habit completion
-     * @param {Object} habit - The habit that was toggled
-     * @param {number} newCount - New completion count
-     */
     function generateCompletionToast(habit, newCount) {
       const goal = habit.dailyGoal || 1
       const habitStreak = streak(habit)
       const todayDone = habits.value.filter(h => isHabitActiveToday(h) && isFullyDoneToday(h)).length
       const todayActiveTotal = habits.value.filter(h => isHabitActiveToday(h)).length
 
-      // Just completed this habit fully
       if (newCount === goal) {
-        // Check if all habits are now done
         if (todayDone === todayActiveTotal) {
           showToast('Všechny zvyky splněny! 🎉', '🏆', 'complete')
-        }
-        // Milestone streak
-        else if (habitStreak > 0 && habitStreak % 7 === 0) {
+        } else if (habitStreak > 0 && habitStreak % 7 === 0) {
           showToast(`${habitStreak} denní série! Pokračuj!`, '🔥', 'streak')
-        }
-        // New streak started (day 1)
-        else if (habitStreak === 1) {
+        } else if (habitStreak === 1) {
           showToast('Série zahájena!', '✨', 'success')
-        }
-        // Regular streak
-        else if (habitStreak > 1) {
+        } else if (habitStreak > 1) {
           showToast(`${habitStreak} denní série!`, '🔥', 'streak')
-        }
-        // Just completed
-        else {
+        } else {
           showToast(`${habit.name} splněno!`, '✅', 'success')
         }
-      }
-      // Partial progress on multi-goal habit
-      else if (newCount > 0 && goal > 1) {
+      } else if (newCount > 0 && goal > 1) {
         showToast(`${newCount}/${goal} hotovo`, '💪', 'success', 1500)
       }
     }
 
     // ============================================
-    // COMPUTED PROPERTIES
+    // COMPUTED PROPERTIES - BASIC
     // ============================================
     
     const currentDate = computed(() => {
@@ -217,6 +241,44 @@ createApp({
         year: 'numeric'
       })
     })
+
+    const filteredHabits = computed(() => {
+      if (selectedCategory.value === null) {
+        return habits.value
+      }
+      return habits.value.filter(h => h.categoryId === selectedCategory.value)
+    })
+
+    const todayCompleted = computed(() => {
+      return habits.value.filter(h => isHabitActiveToday(h) && isFullyDoneToday(h)).length
+    })
+
+    const todayTotal = computed(() => {
+      return habits.value.filter(h => isHabitActiveToday(h)).length
+    })
+
+    const totalHabits = computed(() => habits.value.length)
+
+    const bestStreak = computed(() => {
+      if (habits.value.length === 0) return 0
+      return Math.max(...habits.value.map(h => streak(h)))
+    })
+
+    const totalCompletions = computed(() => {
+      let total = 0
+      habits.value.forEach(habit => {
+        Object.entries(habit.days || {}).forEach(([dateStr, count]) => {
+          if (isHabitActiveForDate(habit, dateStr) && count >= (habit.dailyGoal || 1)) {
+            total++
+          }
+        })
+      })
+      return total
+    })
+
+    // ============================================
+    // COMPUTED PROPERTIES - CALENDAR
+    // ============================================
 
     const calendarDays = computed(() => {
       const year = calendarMonth.value.getFullYear()
@@ -279,7 +341,7 @@ createApp({
         const d = new Date(base)
         d.setDate(d.getDate() + i)
         
-        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+        const key = getDateString(d)
         const dayOfWeek = d.getDay()
 
         let completed = 0
@@ -310,33 +372,247 @@ createApp({
       return days
     })
 
-    const todayCompleted = computed(() => {
-      return habits.value.filter(h => isHabitActiveToday(h) && isFullyDoneToday(h)).length
-    })
+    // ============================================
+    // COMPUTED PROPERTIES - ANALYTICS
+    // ============================================
 
-    const todayTotal = computed(() => {
-      return habits.value.filter(h => isHabitActiveToday(h)).length
-    })
-
-    const totalHabits = computed(() => habits.value.length)
-
-    const bestStreak = computed(() => {
-      if (habits.value.length === 0) return 0
-      return Math.max(...habits.value.map(h => streak(h)))
-    })
-
-    const totalCompletions = computed(() => {
-      let total = 0
+    const weeklyAnalytics = computed(() => {
+      const result = []
+      const base = new Date()
       
-      habits.value.forEach(habit => {
-        Object.entries(habit.days || {}).forEach(([dateStr, count]) => {
-          if (isHabitActiveForDate(habit, dateStr) && count >= (habit.dailyGoal || 1)) {
+      for (let i = -6; i <= 0; i++) {
+        const d = new Date(base)
+        d.setDate(d.getDate() + i)
+        const dateStr = getDateString(d)
+        const dayOfWeek = d.getDay()
+        
+        let completed = 0
+        let total = 0
+        
+        habits.value.forEach(h => {
+          const activeDays = h.activeDays || [0, 1, 2, 3, 4, 5, 6]
+          if (activeDays.includes(dayOfWeek)) {
             total++
+            const count = h.days[dateStr] || 0
+            if (count >= (h.dailyGoal || 1)) {
+              completed++
+            }
           }
         })
-      })
+        
+        result.push({
+          day: dayNames[dayOfWeek],
+          percentage: total > 0 ? Math.round((completed / total) * 100) : 0,
+          isToday: i === 0
+        })
+      }
       
-      return total
+      return result
+    })
+
+    const completionTrend = computed(() => {
+      if (habits.value.length === 0) return 0
+      
+      const getWeekAverage = (weeksAgo) => {
+        let totalPercentage = 0
+        let days = 0
+        const base = new Date()
+        
+        for (let i = 0; i < 7; i++) {
+          const d = new Date(base)
+          d.setDate(d.getDate() - (weeksAgo * 7) - i)
+          const dateStr = getDateString(d)
+          const dayOfWeek = d.getDay()
+          
+          let completed = 0
+          let total = 0
+          
+          habits.value.forEach(h => {
+            const activeDays = h.activeDays || [0, 1, 2, 3, 4, 5, 6]
+            if (activeDays.includes(dayOfWeek)) {
+              total++
+              const count = h.days[dateStr] || 0
+              if (count >= (h.dailyGoal || 1)) {
+                completed++
+              }
+            }
+          })
+          
+          if (total > 0) {
+            totalPercentage += (completed / total) * 100
+            days++
+          }
+        }
+        
+        return days > 0 ? totalPercentage / days : 0
+      }
+      
+      const thisWeek = getWeekAverage(0)
+      const lastWeek = getWeekAverage(1)
+      
+      return Math.round(thisWeek - lastWeek)
+    })
+
+    const bestDayOfWeek = computed(() => {
+      if (habits.value.length === 0) return '-'
+      
+      const dayStats = [0, 0, 0, 0, 0, 0, 0]
+      const dayCounts = [0, 0, 0, 0, 0, 0, 0]
+      
+      const base = new Date()
+      for (let i = 0; i < 30; i++) {
+        const d = new Date(base)
+        d.setDate(d.getDate() - i)
+        const dateStr = getDateString(d)
+        const dayOfWeek = d.getDay()
+        
+        let completed = 0
+        let total = 0
+        
+        habits.value.forEach(h => {
+          const activeDays = h.activeDays || [0, 1, 2, 3, 4, 5, 6]
+          if (activeDays.includes(dayOfWeek)) {
+            total++
+            const count = h.days[dateStr] || 0
+            if (count >= (h.dailyGoal || 1)) {
+              completed++
+            }
+          }
+        })
+        
+        if (total > 0) {
+          dayStats[dayOfWeek] += (completed / total) * 100
+          dayCounts[dayOfWeek]++
+        }
+      }
+      
+      let bestDay = 0
+      let bestAverage = 0
+      
+      for (let i = 0; i < 7; i++) {
+        const avg = dayCounts[i] > 0 ? dayStats[i] / dayCounts[i] : 0
+        if (avg > bestAverage) {
+          bestAverage = avg
+          bestDay = i
+        }
+      }
+      
+      return dayNamesFull[bestDay]
+    })
+
+    const averageCompletionRate = computed(() => {
+      if (habits.value.length === 0) return 0
+      
+      let totalPercentage = 0
+      let days = 0
+      const base = new Date()
+      
+      for (let i = 0; i < 30; i++) {
+        const d = new Date(base)
+        d.setDate(d.getDate() - i)
+        const dateStr = getDateString(d)
+        const dayOfWeek = d.getDay()
+        
+        let completed = 0
+        let total = 0
+        
+        habits.value.forEach(h => {
+          const activeDays = h.activeDays || [0, 1, 2, 3, 4, 5, 6]
+          if (activeDays.includes(dayOfWeek)) {
+            total++
+            const count = h.days[dateStr] || 0
+            if (count >= (h.dailyGoal || 1)) {
+              completed++
+            }
+          }
+        })
+        
+        if (total > 0) {
+          totalPercentage += (completed / total) * 100
+          days++
+        }
+      }
+      
+      return days > 0 ? Math.round(totalPercentage / days) : 0
+    })
+
+    const perfectDays = computed(() => {
+      if (habits.value.length === 0) return 0
+      
+      let count = 0
+      const base = new Date()
+      
+      for (let i = 0; i < 30; i++) {
+        const d = new Date(base)
+        d.setDate(d.getDate() - i)
+        const dateStr = getDateString(d)
+        const dayOfWeek = d.getDay()
+        
+        let completed = 0
+        let total = 0
+        
+        habits.value.forEach(h => {
+          const activeDays = h.activeDays || [0, 1, 2, 3, 4, 5, 6]
+          if (activeDays.includes(dayOfWeek)) {
+            total++
+            const cnt = h.days[dateStr] || 0
+            if (cnt >= (h.dailyGoal || 1)) {
+              completed++
+            }
+          }
+        })
+        
+        if (total > 0 && completed === total) {
+          count++
+        }
+      }
+      
+      return count
+    })
+
+    const categoryBreakdown = computed(() => {
+      return categories.value.map(cat => {
+        const categoryHabits = habits.value.filter(h => h.categoryId === cat.id)
+        
+        if (categoryHabits.length === 0) {
+          return { ...cat, completionRate: 0 }
+        }
+        
+        let totalPercentage = 0
+        let count = 0
+        const base = new Date()
+        
+        for (let i = 0; i < 7; i++) {
+          const d = new Date(base)
+          d.setDate(d.getDate() - i)
+          const dateStr = getDateString(d)
+          const dayOfWeek = d.getDay()
+          
+          let completed = 0
+          let total = 0
+          
+          categoryHabits.forEach(h => {
+            const activeDays = h.activeDays || [0, 1, 2, 3, 4, 5, 6]
+            if (activeDays.includes(dayOfWeek)) {
+              total++
+              const cnt = h.days[dateStr] || 0
+              if (cnt >= (h.dailyGoal || 1)) {
+                completed++
+              }
+            }
+          })
+          
+          if (total > 0) {
+            totalPercentage += (completed / total) * 100
+            count++
+          }
+        }
+        
+        return {
+          ...cat,
+          completionRate: count > 0 ? Math.round(totalPercentage / count) : 0
+        }
+      }).filter(cat => habits.value.some(h => h.categoryId === cat.id))
     })
 
     // ============================================
@@ -372,7 +648,7 @@ createApp({
       let d = new Date()
 
       while (count < 365) {
-        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+        const key = getDateString(d)
         
         if (!isHabitActiveForDate(habit, key)) {
           d.setDate(d.getDate() - 1)
@@ -403,61 +679,51 @@ createApp({
         .join(', ')
     }
 
+    function getCategoryColor(categoryId) {
+      const category = categories.value.find(c => c.id === categoryId)
+      return category ? category.color : '#667eea'
+    }
+
+    function getCategoryHabitCount(categoryId) {
+      return habits.value.filter(h => h.categoryId === categoryId).length
+    }
+
     // ============================================
     // DRAG AND DROP FUNCTIONS
     // ============================================
 
-    /**
-     * Handle drag start event
-     * @param {DragEvent} event 
-     * @param {number} index - Index of the habit being dragged
-     */
     function onDragStart(event, index) {
-      draggedHabit.value = habits.value[index]
+      draggedHabit.value = filteredHabits.value[index]
       draggedIndex.value = index
       event.dataTransfer.effectAllowed = 'move'
       event.dataTransfer.setData('text/plain', index)
     }
 
-    /**
-     * Handle drag over event
-     * @param {DragEvent} event 
-     * @param {number} index - Index of the habit being dragged over
-     */
     function onDragOver(event, index) {
       if (draggedIndex.value === null || draggedIndex.value === index) return
       
-      // Reorder the habits array
-      const draggedItem = habits.value[draggedIndex.value]
-      habits.value.splice(draggedIndex.value, 1)
-      habits.value.splice(index, 0, draggedItem)
+      const draggedItem = filteredHabits.value[draggedIndex.value]
+      const actualDraggedIndex = habits.value.findIndex(h => h.id === draggedItem.id)
+      const targetItem = filteredHabits.value[index]
+      const actualTargetIndex = habits.value.findIndex(h => h.id === targetItem.id)
+      
+      habits.value.splice(actualDraggedIndex, 1)
+      habits.value.splice(actualTargetIndex, 0, draggedItem)
       draggedIndex.value = index
     }
 
-    /**
-     * Handle drag end event
-     */
     function onDragEnd() {
       draggedHabit.value = null
       draggedIndex.value = null
     }
 
-    /**
-     * Handle touch start for mobile drag
-     * @param {TouchEvent} event 
-     * @param {number} index 
-     */
     function onTouchStart(event, index) {
       touchStartY.value = event.touches[0].clientY
       touchCurrentIndex.value = index
-      draggedHabit.value = habits.value[index]
+      draggedHabit.value = filteredHabits.value[index]
       draggedIndex.value = index
     }
 
-    /**
-     * Handle touch move for mobile drag
-     * @param {TouchEvent} event 
-     */
     function onTouchMove(event) {
       if (draggedIndex.value === null) return
 
@@ -466,21 +732,20 @@ createApp({
       
       habitElements.forEach((el, index) => {
         const rect = el.getBoundingClientRect()
-        const centerY = rect.top + rect.height / 2
 
         if (touchY > rect.top && touchY < rect.bottom && index !== draggedIndex.value) {
-          // Reorder
-          const draggedItem = habits.value[draggedIndex.value]
-          habits.value.splice(draggedIndex.value, 1)
-          habits.value.splice(index, 0, draggedItem)
+          const draggedItem = filteredHabits.value[draggedIndex.value]
+          const actualDraggedIndex = habits.value.findIndex(h => h.id === draggedItem.id)
+          const targetItem = filteredHabits.value[index]
+          const actualTargetIndex = habits.value.findIndex(h => h.id === targetItem.id)
+          
+          habits.value.splice(actualDraggedIndex, 1)
+          habits.value.splice(actualTargetIndex, 0, draggedItem)
           draggedIndex.value = index
         }
       })
     }
 
-    /**
-     * Handle touch end for mobile drag
-     */
     function onTouchEnd() {
       draggedHabit.value = null
       draggedIndex.value = null
@@ -524,7 +789,8 @@ createApp({
         icon: selectedIcon.value,
         dailyGoal: dailyGoal.value,
         days: {},
-        activeDays: [...selectedDays.value]
+        activeDays: [...selectedDays.value],
+        categoryId: selectedCategoryId.value
       })
       
       showToast(`${newHabit.value} přidáno!`, '✨', 'success')
@@ -536,6 +802,40 @@ createApp({
     function closeModal() {
       showModal.value = false
       newHabit.value = ''
+    }
+
+    function addCategory() {
+      if (!newCategoryName.value.trim()) return
+      
+      categories.value.push({
+        id: Date.now(),
+        name: newCategoryName.value,
+        color: selectedColor.value
+      })
+      
+      showToast(`Kategorie "${newCategoryName.value}" vytvořena!`, '🏷️', 'success')
+      
+      newCategoryName.value = ''
+      showCategoryModal.value = false
+    }
+
+    function deleteCategory(categoryId) {
+      // Remove category from habits
+      habits.value.forEach(h => {
+        if (h.categoryId === categoryId) {
+          h.categoryId = null
+        }
+      })
+      
+      // Remove category
+      categories.value = categories.value.filter(c => c.id !== categoryId)
+      
+      // Reset filter if this category was selected
+      if (selectedCategory.value === categoryId) {
+        selectedCategory.value = null
+      }
+      
+      showToast('Kategorie smazána', '🗑️', 'success')
     }
 
     function removeHabit(habit) {
@@ -558,17 +858,59 @@ createApp({
       const currentCount = habit.days[d] || 0
       const goal = habit.dailyGoal || 1
       
-      // Calculate new count
       const newCount = currentCount >= goal ? 0 : currentCount + 1
       habit.days[d] = newCount
 
-      // Show toast only when making progress (not when resetting)
       if (newCount > 0) {
-        // Use nextTick to ensure streak calculation is accurate
         nextTick(() => {
           generateCompletionToast(habit, newCount)
         })
       }
+    }
+
+    // ============================================
+    // EDIT HABIT FUNCTIONS
+    // ============================================
+
+    function openEditModal(habit) {
+      habitToEdit.value = habit
+      editShowCustom.value = habit.dailyGoal > 3
+      editForm.value = {
+        name: habit.name,
+        icon: habit.icon,
+        dailyGoal: habit.dailyGoal || 1,
+        activeDays: [...(habit.activeDays || [0, 1, 2, 3, 4, 5, 6])],
+        categoryId: habit.categoryId || null
+      }
+    }
+
+    function toggleEditDay(day) {
+      const index = editForm.value.activeDays.indexOf(day)
+      
+      if (index > -1) {
+        if (editForm.value.activeDays.length > 1) {
+          editForm.value.activeDays.splice(index, 1)
+        }
+      } else {
+        editForm.value.activeDays.push(day)
+      }
+    }
+
+    function saveHabitEdit() {
+      if (!editForm.value.name.trim() || !habitToEdit.value) return
+      
+      const habit = habits.value.find(h => h.id === habitToEdit.value.id)
+      if (habit) {
+        habit.name = editForm.value.name
+        habit.icon = editForm.value.icon
+        habit.dailyGoal = editForm.value.dailyGoal
+        habit.activeDays = [...editForm.value.activeDays]
+        habit.categoryId = editForm.value.categoryId
+        
+        showToast(`${habit.name} aktualizováno!`, '✏️', 'success')
+      }
+      
+      habitToEdit.value = null
     }
 
     // ============================================
@@ -578,6 +920,7 @@ createApp({
     return {
       // State
       habits,
+      categories,
       newHabit,
       selectedIcon,
       dailyGoal,
@@ -586,36 +929,56 @@ createApp({
       showModal,
       showCalendar,
       showSettings,
+      showCategoryModal,
       habitToDelete,
+      habitToEdit,
+      editForm,
+      editShowCustom,
       habitInput,
       calendarMonth,
       carouselRef,
       selectedDays,
+      selectedCategoryId,
+      selectedCategory,
+      newCategoryName,
+      selectedColor,
       draggedHabit,
       toast,
       
       // Constants
       dayNames,
       availableIcons,
+      availableColors,
       
       // Computed
       currentDate,
       calendarMonthLabel,
       calendarDays,
       carouselDays,
+      filteredHabits,
       todayCompleted,
       todayTotal,
       totalHabits,
       bestStreak,
       totalCompletions,
+      weeklyAnalytics,
+      completionTrend,
+      bestDayOfWeek,
+      averageCompletionRate,
+      perfectDays,
+      categoryBreakdown,
       
       // Methods
       previousMonth,
       nextMonth,
       toggleDay,
       getActiveDaysText,
+      getCategoryColor,
+      getCategoryHabitCount,
       addHabit,
       closeModal,
+      addCategory,
+      deleteCategory,
       removeHabit,
       confirmDelete,
       toggleToday,
@@ -624,6 +987,9 @@ createApp({
       isHabitActiveToday,
       getProgressPercent,
       streak,
+      openEditModal,
+      toggleEditDay,
+      saveHabitEdit,
       
       // Drag and drop
       onDragStart,
