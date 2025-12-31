@@ -55,6 +55,56 @@ body {
 }
 
 /* ============================================
+   CATEGORY FILTER
+   ============================================ */
+.category-filter {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 4px 0 16px;
+  scrollbar-width: none;
+}
+
+.category-filter::-webkit-scrollbar {
+  display: none;
+}
+
+.filter-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 20px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: 'Outfit', sans-serif;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.filter-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.filter-btn.active {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: transparent;
+  color: #333;
+}
+
+.filter-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+/* ============================================
    STATISTICS CARDS
    ============================================ */
 .stats {
@@ -212,7 +262,7 @@ body {
   gap: 10px;
   overflow-x: auto;
   padding: 12px 4px 4px;
-  margin-bottom: 28px;
+  margin-bottom: 16px;
   scrollbar-width: none;
 }
 
@@ -290,14 +340,18 @@ body {
 .habit {
   background: var(--card-bg);
   border-radius: 20px;
-  padding: 16px;
-  display: flex;
+  padding: 12px 16px;
+  display: grid;
+  grid-template-columns: auto auto 1fr auto;
+  grid-template-rows: auto auto;
+  gap: 0 14px;
   align-items: center;
-  gap: 12px;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
   cursor: grab;
   user-select: none;
+  position: relative;
+  overflow: hidden;
 }
 
 .habit:hover {
@@ -316,10 +370,6 @@ body {
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
 }
 
-.habit.drag-over {
-  border-top: 3px solid var(--primary-start);
-}
-
 .habit.habit-inactive {
   opacity: 0.5;
 }
@@ -328,16 +378,27 @@ body {
   pointer-events: none;
 }
 
+/* Category Indicator */
+.habit-category-indicator {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  border-radius: 20px 0 0 20px;
+}
+
 /* Drag Handle */
 .habit-drag-handle {
+  grid-row: span 2;
   color: #ccc;
   font-size: 16px;
   cursor: grab;
-  padding: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: color 0.2s;
+  align-self: center;
 }
 
 .habit-drag-handle:active {
@@ -350,6 +411,7 @@ body {
 
 /* Habit Icon */
 .habit-icon {
+  grid-row: span 2;
   width: 52px;
   height: 52px;
   border-radius: 16px;
@@ -360,25 +422,32 @@ body {
   font-size: 28px;
   flex-shrink: 0;
   box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+  align-self: center;
 }
 
 /* Habit Info */
 .habit-info {
-  flex: 1;
+  grid-column: 3;
+  grid-row: span 2;
+  min-width: 0;
+  padding-right: 8px;
 }
 
 .habit-info h3 {
-  margin: 0 0 6px;
+  margin: 0 0 4px;
   font-size: 17px;
   font-weight: 600;
   color: #333;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .habit-info .progress-info {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
 
 .habit-info .progress-count {
@@ -415,15 +484,24 @@ body {
 .habit-days-indicator {
   font-size: 11px;
   color: #999;
-  margin-top: 4px;
+  margin-top: 2px;
+}
+
+/* Habit Actions Container */
+.habit-actions {
+  grid-column: 4;
+  grid-row: span 2;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 /* ============================================
    HABIT CHECK BUTTON
    ============================================ */
 .habit-check {
-  width: 52px;
-  height: 52px;
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
   border: none;
   display: flex;
@@ -486,7 +564,7 @@ body {
 
 .habit-check .checkmark {
   color: #bbb;
-  font-size: 24px;
+  font-size: 22px;
   font-weight: bold;
   transition: all 0.3s;
   position: relative;
@@ -502,21 +580,39 @@ body {
 }
 
 /* ============================================
-   HABIT DELETE BUTTON
+   HABIT ACTION BUTTONS (EDIT & DELETE)
    ============================================ */
+.habit-action-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.habit-edit,
 .habit-delete {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
   border: none;
   background: rgba(0, 0, 0, 0.05);
   color: #bbb;
-  font-size: 18px;
+  font-size: 14px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.habit-edit:hover {
+  background: linear-gradient(135deg, var(--primary-start), var(--primary-end));
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+  transform: scale(1.1);
+}
+
+.habit-edit:active {
+  transform: scale(0.95);
 }
 
 .habit-delete:hover {
@@ -528,8 +624,6 @@ body {
 
 .habit-delete:active {
   transform: scale(0.95);
-  background: linear-gradient(135deg, #ef4444, #dc2626);
-  color: #fff;
 }
 
 /* ============================================
@@ -603,7 +697,6 @@ body {
   background: linear-gradient(135deg, var(--primary-start), var(--primary-end));
 }
 
-/* Toast Animation */
 .toast-enter-active {
   animation: toastIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -666,9 +759,6 @@ body {
   z-index: 10001;
 }
 
-/* ============================================
-   ANIMATIONS
-   ============================================ */
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -754,7 +844,7 @@ body {
 }
 
 /* ============================================
-   CALENDAR - Month Navigation
+   CALENDAR
    ============================================ */
 .month-nav {
   display: flex;
@@ -794,9 +884,6 @@ body {
   text-transform: capitalize;
 }
 
-/* ============================================
-   CALENDAR - Weekday Headers & Grid
-   ============================================ */
 .calendar-weekdays {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
@@ -870,9 +957,6 @@ body {
   margin-top: 2px;
 }
 
-/* ============================================
-   CALENDAR - Legend
-   ============================================ */
 .calendar-legend {
   display: flex;
   justify-content: center;
@@ -909,7 +993,170 @@ body {
 }
 
 /* ============================================
-   SETTINGS - Sections & Items
+   ANALYTICS
+   ============================================ */
+.analytics-card {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 16px;
+}
+
+.analytics-card h4 {
+  margin: 0 0 16px;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 600;
+}
+
+.weekly-chart {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  height: 120px;
+  gap: 8px;
+}
+
+.weekly-bar {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  position: relative;
+}
+
+.weekly-bar .bar-fill {
+  width: 100%;
+  max-width: 32px;
+  background: linear-gradient(180deg, var(--primary-start), var(--primary-end));
+  border-radius: 6px 6px 0 0;
+  margin-top: auto;
+  min-height: 4px;
+  transition: height 0.3s;
+}
+
+.weekly-bar.today .bar-fill {
+  background: linear-gradient(180deg, var(--success-start), var(--success-end));
+  box-shadow: 0 0 10px rgba(76, 175, 80, 0.4);
+}
+
+.weekly-bar .bar-label {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
+  margin-top: 8px;
+  text-transform: uppercase;
+}
+
+.weekly-bar.today .bar-label {
+  color: #fff;
+  font-weight: 600;
+}
+
+.weekly-bar .bar-value {
+  position: absolute;
+  top: 0;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.6);
+  font-weight: 600;
+}
+
+.analytics-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.metric-card {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 14px;
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.metric-icon {
+  font-size: 24px;
+}
+
+.metric-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.metric-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.metric-value.positive {
+  color: #4caf50;
+}
+
+.metric-value.negative {
+  color: #ef4444;
+}
+
+.metric-label {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
+  margin-top: 2px;
+}
+
+.category-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.category-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.category-stat-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.category-stat-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.category-stat-name {
+  flex: 1;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.category-stat-value {
+  font-size: 13px;
+  color: #fff;
+  font-weight: 600;
+}
+
+.category-stat-bar {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.category-stat-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s;
+}
+
+/* ============================================
+   SETTINGS
    ============================================ */
 .settings-section {
   margin-bottom: 28px;
@@ -922,6 +1169,27 @@ body {
   text-transform: uppercase;
   letter-spacing: 1px;
   margin-bottom: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.add-category-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: 'Outfit', sans-serif;
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.add-category-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
 }
 
 .settings-item {
@@ -975,9 +1243,26 @@ body {
   font-weight: 500;
 }
 
-/* ============================================
-   SETTINGS - Stats Grid
-   ============================================ */
+.category-delete-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.category-delete-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -1008,7 +1293,7 @@ body {
 }
 
 /* ============================================
-   ADD HABIT MODAL
+   MODALS
    ============================================ */
 .modal-content {
   background: linear-gradient(180deg, #1a0a2e, #16082a);
@@ -1024,6 +1309,10 @@ body {
   animation: scaleIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+.modal-content.modal-small {
+  max-width: 340px;
+}
+
 .modal-content h2 {
   margin: 0 0 28px;
   font-size: 26px;
@@ -1032,9 +1321,6 @@ body {
   font-weight: 700;
 }
 
-/* ============================================
-   FORM ELEMENTS
-   ============================================ */
 .form-group {
   margin-bottom: 24px;
 }
@@ -1070,9 +1356,6 @@ body {
   background: rgba(102, 126, 234, 0.1);
 }
 
-/* ============================================
-   ICON SELECTOR
-   ============================================ */
 .icon-selector {
   display: grid;
   grid-template-columns: repeat(6, 1fr);
@@ -1107,9 +1390,69 @@ body {
   box-shadow: 0 0 20px rgba(102, 126, 234, 0.3);
 }
 
-/* ============================================
-   FREQUENCY SELECTOR
-   ============================================ */
+.category-selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.category-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  font-size: 13px;
+  font-weight: 500;
+  font-family: 'Outfit', sans-serif;
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.category-option:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.category-option.selected {
+  border-color: var(--primary-start);
+  background: rgba(102, 126, 234, 0.2);
+  color: #fff;
+}
+
+.category-option-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.color-selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.color-option {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  border: 3px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.color-option:hover {
+  transform: scale(1.1);
+}
+
+.color-option.selected {
+  border-color: #fff;
+  box-shadow: 0 0 15px rgba(255, 255, 255, 0.3);
+  transform: scale(1.1);
+}
+
 .frequency-selector {
   display: flex;
   gap: 8px;
@@ -1168,9 +1511,6 @@ body {
   color: rgba(255, 255, 255, 0.6);
 }
 
-/* ============================================
-   DAY SELECTOR
-   ============================================ */
 .day-selector {
   display: flex;
   gap: 6px;
@@ -1200,9 +1540,6 @@ body {
   color: #fff;
 }
 
-/* ============================================
-   MODAL BUTTONS
-   ============================================ */
 .modal-buttons {
   display: flex;
   gap: 12px;
@@ -1242,7 +1579,7 @@ body {
 }
 
 /* ============================================
-   DELETE CONFIRMATION MODAL
+   DELETE MODAL
    ============================================ */
 .delete-modal-content {
   background: linear-gradient(180deg, #1a0a2e, #16082a);
@@ -1342,7 +1679,7 @@ body {
 }
 
 /* ============================================
-   RESPONSIVE - Mobile Adjustments
+   RESPONSIVE
    ============================================ */
 @media (max-width: 480px) {
   body {
@@ -1421,5 +1758,9 @@ body {
       opacity: 0;
       transform: translateY(-20px) scale(0.9);
     }
+  }
+
+  .analytics-metrics {
+    grid-template-columns: 1fr;
   }
 }
