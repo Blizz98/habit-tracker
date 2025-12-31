@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Be Productive!</title>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Header -->
+    <div class="header">
+      <h1>Be Productive!</h1>
+      <div class="date">{{ currentDate }}</div>
+    </div>
+
+    <!-- Calendar Carousel -->
+    <div class="calendar-carousel" ref="carouselRef">
+      <div 
+        v-for="day in carouselDays" 
+        :key="day.date" 
+        class="carousel-day" 
+        :class="{
+          today: day.isToday,
+          complete: day.completionRate === 1,
+          partial: day.completionRate > 0 && day.completionRate < 1,
+          incomplete: day.completionRate === 0 && !day.isToday && day.hasHabits
+        }"
+      >
+        <div class="weekday">{{ day.weekday }}</div>
+        <div class="day">{{ day.day }}</div>
+      </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="stats">
+      <div class="stat-card">
+        <span class="number">{{ todayCompleted }}/{{ todayTotal }}</span>
+        <span class="label">Dnes</span>
+      </div>
+      <div class="stat-card">
+        <span class="number">{{ totalHabits }}</span>
+        <span class="label">Zvyků</span>
+      </div>
+      <div class="stat-card">
+        <span class="number">{{ bestStreak }}</span>
+        <span class="label">Top Série</span>
+      </div>
+    </div>
+
+    <!-- Habits List -->
+    <div class="habits" v-if="habits.length > 0">
+      <div 
+        class="habit" 
+        v-for="(habit, index) in habits" 
+        :key="habit.id" 
+        :class="{ 
+          'habit-inactive': !isHabitActiveToday(habit),
+          'dragging': draggedHabit && draggedHabit.id === habit.id
+        }"
+        draggable="true"
+        @dragstart="onDragStart($event, index)"
+        @dragover.prevent="onDragOver($event, index)"
+        @dragend="onDragEnd"
+        @touchstart="onTouchStart($event, index)"
+        @touchmove="onTouchMove($event)"
+        @touchend="onTouchEnd"
+      >
+        <!-- Drag Handle -->
+        <div class="habit-drag-handle">
+          <span>⋮⋮</span>
+        </div>
+
+        <!-- Habit Icon -->
+        <div class="habit-icon">{{ habit.icon }}</div>
+
+        <!-- Habit Info -->
+        <div class="habit-info">
+          <h3>{{ habit.name }}</h3>
+          <div class="progress-info" v-if="habit.dailyGoal > 1 && isHabitActiveToday(habit)">
+            <span class="progress-count">{{ getCompletionCount(habit) }}/{{ habit.dailyGoal }}</span>
+            <div class="progress-bar-container">
+              <div class="progress-bar" :style="{ width: getProgressPercent(habit) + '%' }"></div>
+            </div>
+          </div>
+          <div class="streak" v-if="isHabitActiveToday(habit)">
+            <span class="fire">🔥</span> {{ streak(habit) }} denní série
+          </div>
+          <div class="habit-days-indicator" v-if="!isHabitActiveToday(habit)">
+            Dnes volno • {{ getActiveDaysText(habit) }}
+          </div>
+          <div class="habit-days-indicator" v-else-if="habit.activeDays && habit.activeDays.length < 7">
+            {{ getActiveDaysText(habit) }}
+          </div>
+        </div>
+
+        <!-- Habit Check Button -->
+        <div 
+          class="habit-check" 
+          :class="{ 
+            partial: getCompletionCount(habit) > 0 && getCompletionCount(habit) < habit.dailyGoal,
+            done: isFullyDoneToday(habit) 
+          }"
+          :style="{ '--progress': getProgressPercent(habit) }"
+          @click="toggleToday(habit)"
+          v-if="isHabitActiveToday(habit)"
+        >
+          <span class="checkmark">✓</span>
+        </div>
+        <div class="habit-check" v-else style="opacity: 0.3; pointer-events: none;">
+          <span class="checkmark">—</span>
+        </div>
+
+        <!-- Delete Button -->
+        <button class="habit-delete" @click="removeHabit(habit)">×</button>
+      </div>
+    </div>
+
+    <!-- Empty State -->
+    <div class="empty-state" v-else>
+      <span class="emoji">🎯</span>
+      <h3>Žádné zvyky</h3>
+      <p>Přidej svůj první zvyk a začni!</p>
+    </div>
+
+    <!-- Bottom Navigation -->
+    <div class="bottom-nav">
+      <div class="nav-container">
+        <button class="nav-btn" @click="showCalendar = true">
+          <span>📅</span>
+        </button>
+        <button class="nav-btn nav-btn-add" @click="showModal = true">
+          <span>+</span>
+        </button>
+        <button class="nav-btn" @click="showSettings = true">
+          <span>📊</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <transition name="toast">
+      <div class="toast" v-if="toast.show" :class="toast.type">
+        <span class="toast-icon">{{ toast.icon }}</span>
+        <span class="toast-message">{{ toast.message }}</span>
+      </div>
+    </transition>
+
+    <!-- Calendar View Modal -->
+    <div class="calendar-view" v-if="showCalendar" @click.self="showCalendar = false">
+      <div class="calendar-content">
+        <div class="calendar-header">
+          <h2>📅 Kalendář</h2>
+          <button class="close-button" @click="showCalendar = false">×</button>
+        </div>
+        <div class="calendar-body">
+          <div class="month-nav">
+            <button @click="previousMonth">‹</button>
+            <div class="calendar-month-label">{{ calendarMonthLabel }}</div>
+            <button @click="nextMonth">›</button>
+          </div>
+          <div class="calendar-weekdays">
+            <div class="calendar-weekday">Po</div>
+            <div class="calendar-weekday">Út</div>
+            <div class="calendar-weekday">St</div>
+            <div class="calendar-weekday">Čt</div>
+            <div class="calendar-weekday">Pá</div>
+            <div class="calendar-weekday">So</div>
+            <div class="calendar-weekday">Ne</div>
+          </div>
+          <div class="calendar-grid">
+            <div 
+              v-for="day in calendarDays" 
+              :key="day.key" 
+              class="calendar-day" 
+              :class="{
+                empty: day.empty,
+                'other-month': day.otherMonth,
+                today: day.isToday,
+                'has-completion': day.completionRate > 0 && day.completionRate < 1,
+                'full-completion': day.completionRate === 1
+              }"
+            >
+              <span v-if="!day.empty">{{ day.day }}</span>
+              <span class="completion-indicator" v-if="day.completionRate > 0 && !day.empty">
+                {{ day.completed }}/{{ day.total }}
+              </span>
+            </div>
+          </div>
+          <div class="calendar-legend">
+            <div class="legend-item">
+              <div class="legend-dot today"></div>
+              <span>Dnes</span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-dot partial"></div>
+              <span>Částečně</span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-dot complete"></div>
+              <span>Hotovo</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Settings/Stats View Modal -->
+    <div class="settings-view" v-if="showSettings" @click.self="showSettings = false">
+      <div class="settings-content">
+        <div class="settings-header">
+          <h2>📊 Statistiky</h2>
+          <button class="close-button" @click="showSettings = false">×</button>
+        </div>
+        <div class="settings-body">
+          <div class="settings-section">
+            <div class="settings-section-title">Přehled</div>
+            <div class="stats-grid">
+              <div class="stat-box">
+                <div class="stat-box-number">{{ totalHabits }}</div>
+                <div class="stat-box-label">Celkem zvyků</div>
+              </div>
+              <div class="stat-box">
+                <div class="stat-box-number">{{ todayCompleted }}/{{ todayTotal }}</div>
+                <div class="stat-box-label">Dnes splněno</div>
+              </div>
+              <div class="stat-box">
+                <div class="stat-box-number">{{ bestStreak }}</div>
+                <div class="stat-box-label">Nejdelší série</div>
+              </div>
+              <div class="stat-box">
+                <div class="stat-box-number">{{ totalCompletions }}</div>
+                <div class="stat-box-label">Celkem splnění</div>
+              </div>
+            </div>
+          </div>
+          <div class="settings-section">
+            <div class="settings-section-title">Zvyky</div>
+            <div class="settings-item" v-for="habit in habits" :key="habit.id">
+              <div class="settings-item-left">
+                <div class="settings-item-icon">{{ habit.icon }}</div>
+                <div class="settings-item-text">
+                  <h4>{{ habit.name }}</h4>
+                  <p>{{ habit.dailyGoal }}x denně • {{ getActiveDaysText(habit) }}</p>
+                </div>
+              </div>
+              <div class="settings-value">🔥 {{ streak(habit) }}</div>
+            </div>
+            <div class="settings-item" v-if="habits.length === 0">
+              <div class="settings-item-left">
+                <div class="settings-item-icon">📝</div>
+                <div class="settings-item-text">
+                  <h4>Žádné zvyky</h4>
+                  <p>Přidej svůj první zvyk</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Add Habit Modal -->
+    <div class="modal" v-if="showModal" @click.self="showModal = false">
+      <div class="modal-content">
+        <h2>✨ Nový zvyk</h2>
+        
+        <div class="form-group">
+          <label class="form-label">Název</label>
+          <input 
+            type="text" 
+            v-model="newHabit" 
+            placeholder="např. Cvičit, Meditovat..." 
+            @keyup.enter="addHabit" 
+            ref="habitInput"
+          />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Ikonka</label>
+          <div class="icon-selector">
+            <button 
+              v-for="icon in availableIcons" 
+              :key="icon" 
+              class="icon-option" 
+              :class="{ selected: selectedIcon === icon }" 
+              @click="selectedIcon = icon"
+            >
+              {{ icon }}
+            </button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Denní cíl</label>
+          <div class="frequency-selector">
+            <button class="frequency-btn" :class="{ active: dailyGoal === 1 }" @click="dailyGoal = 1">1×</button>
+            <button class="frequency-btn" :class="{ active: dailyGoal === 2 }" @click="dailyGoal = 2">2×</button>
+            <button class="frequency-btn" :class="{ active: dailyGoal === 3 }" @click="dailyGoal = 3">3×</button>
+          </div>
+          <div class="custom-frequency" v-if="dailyGoal > 3 || showCustom">
+            <input type="number" v-model.number="customGoal" min="1" max="20" @input="dailyGoal = customGoal" />
+            <span>× denně</span>
+          </div>
+          <button 
+            v-if="dailyGoal <= 3 && !showCustom" 
+            class="frequency-btn" 
+            style="margin-top: 10px; width: 100%;" 
+            @click="showCustom = true; customGoal = 4; dailyGoal = 4"
+          >
+            Vlastní
+          </button>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Aktivní dny</label>
+          <div class="day-selector">
+            <button 
+              v-for="(dayName, index) in dayNames" 
+              :key="index" 
+              class="day-btn" 
+              :class="{ active: selectedDays.includes(index) }" 
+              @click="toggleDay(index)"
+            >
+              {{ dayName }}
+            </button>
+          </div>
+        </div>
+
+        <div class="modal-buttons">
+          <button class="btn-cancel" @click="closeModal">Zavřít</button>
+          <button class="btn-primary" @click="addHabit">Vytvořit</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div class="delete-modal" v-if="habitToDelete" @click.self="habitToDelete = null">
+      <div class="delete-modal-content">
+        <div class="delete-modal-icon">🗑️</div>
+        <h3>Smazat zvyk?</h3>
+        <p>Tato akce je nevratná. Všechna data o tomto zvyku budou ztracena.</p>
+        <div class="delete-modal-habit">
+          <span class="delete-modal-habit-icon">{{ habitToDelete.icon }}</span>
+          <span class="delete-modal-habit-name">{{ habitToDelete.name }}</span>
+        </div>
+        <div class="delete-modal-buttons">
+          <button class="btn-delete-cancel" @click="habitToDelete = null">Zrušit</button>
+          <button class="btn-delete-confirm" @click="confirmDelete">Smazat</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
