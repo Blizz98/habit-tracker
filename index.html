@@ -80,15 +80,11 @@
         :key="habit.id" 
         :class="{ 
           'habit-inactive': !isHabitActiveToday(habit),
+          'habit-completed': isHabitActiveToday(habit) && isFullyDoneToday(habit),
+          'habit-celebrating': celebratingHabitId === habit.id,
           'dragging': draggedHabit && draggedHabit.id === habit.id
         }"
-        draggable="true"
-        @dragstart="onDragStart($event, index)"
         @dragover.prevent="onDragOver($event, index)"
-        @dragend="onDragEnd"
-        @touchstart="onTouchStart($event, index)"
-        @touchmove="onTouchMove($event)"
-        @touchend="onTouchEnd"
       >
         <!-- Category Indicator -->
         <div 
@@ -97,8 +93,33 @@
           :style="{ background: getCategoryColor(habit.categoryId) }"
         ></div>
 
-        <!-- Drag Handle -->
-        <div class="habit-drag-handle">
+        <!-- Completed Overlay
+        <div class="habit-completed-overlay" v-if="isHabitActiveToday(habit) && isFullyDoneToday(habit)">
+          <span class="completed-badge">✓</span>
+        </div> -->
+
+        <!-- Celebration Particles -->
+        <div class="celebration-particles" v-if="celebratingHabitId === habit.id">
+          <span class="particle">✨</span>
+          <span class="particle">⭐</span>
+          <span class="particle">🎉</span>
+          <span class="particle">✨</span>
+          <span class="particle">⭐</span>
+          <span class="particle">💫</span>
+          <span class="particle">🌟</span>
+          <span class="particle">🎊</span>
+        </div>
+
+        <!-- Drag Handle - ONLY this triggers drag -->
+        <div 
+          class="habit-drag-handle"
+          draggable="true"
+          @dragstart="onDragStart($event, index)"
+          @dragend="onDragEnd"
+          @touchstart.prevent="onTouchStart($event, index)"
+          @touchmove.prevent="onTouchMove($event)"
+          @touchend="onTouchEnd"
+        >
           <span>⋮⋮</span>
         </div>
 
@@ -286,7 +307,7 @@
                   <span class="metric-value" :class="{ positive: completionTrend > 0, negative: completionTrend < 0 }">
                     {{ completionTrend > 0 ? '+' : '' }}{{ completionTrend }}%
                   </span>
-                  <span class="metric-label">Trend (7 dní)</span>
+                  <span class="metric-label">Trend ({{ trackingDaysForTrend }} {{ trackingDaysForTrend === 1 ? 'den' : trackingDaysForTrend < 5 ? 'dny' : 'dní' }})</span>
                 </div>
               </div>
               <div class="metric-card">
@@ -300,7 +321,7 @@
                 <span class="metric-icon">📊</span>
                 <div class="metric-info">
                   <span class="metric-value">{{ averageCompletionRate }}%</span>
-                  <span class="metric-label">Průměr (30 dní)</span>
+                  <span class="metric-label">Průměr ({{ trackingDaysForAverage }} {{ trackingDaysForAverage === 1 ? 'den' : trackingDaysForAverage < 5 ? 'dny' : 'dní' }})</span>
                 </div>
               </div>
               <div class="metric-card">
