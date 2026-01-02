@@ -80,6 +80,10 @@ createApp({
     })
     let toastTimeout = null
 
+    // Celebration animation state
+    const celebratingHabitId = ref(null)
+    let celebrationTimeout = null
+
     // ============================================
     // CONSTANTS
     // ============================================
@@ -114,7 +118,8 @@ createApp({
           dailyGoal: h.dailyGoal || 1,
           icon: h.icon || '⭐',
           activeDays: h.activeDays || [0, 1, 2, 3, 4, 5, 6],
-          categoryId: h.categoryId || null
+          categoryId: h.categoryId || null,
+          createdAt: h.createdAt || today() // Default to today for existing habits
         }))
       }
       
@@ -125,6 +130,42 @@ createApp({
     } catch (e) {
       console.log('Could not load data from localStorage')
     }
+
+    // ============================================
+    // HELPER - GET TRACKING START DATE
+    // ============================================
+    
+    // Returns the earliest date we should consider for analytics
+    // (the date when user created their first habit)
+    function getTrackingStartDate() {
+      if (habits.value.length === 0) return today()
+      
+      let earliest = today()
+      habits.value.forEach(h => {
+        if (h.createdAt && h.createdAt < earliest) {
+          earliest = h.createdAt
+        }
+      })
+      return earliest
+    }
+
+    // Returns number of days since tracking started
+    function getDaysSinceStart() {
+      const startDate = new Date(getTrackingStartDate())
+      const now = new Date(today())
+      const diffTime = now - startDate
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24))
+      return diffDays + 1 // Include start day
+    }
+
+    // Computed properties for dynamic labels
+    const trackingDaysForAverage = computed(() => {
+      return Math.min(30, getDaysSinceStart())
+    })
+
+    const trackingDaysForTrend = computed(() => {
+      return Math.min(7, getDaysSinceStart())
+    })
 
     // ============================================
     // LIFECYCLE HOOKS
@@ -379,6 +420,7 @@ createApp({
     const weeklyAnalytics = computed(() => {
       const result = []
       const base = new Date()
+      const startDateStr = getTrackingStartDate()
       
       for (let i = -6; i <= 0; i++) {
         const d = new Date(base)
@@ -386,10 +428,24 @@ createApp({
         const dateStr = getDateString(d)
         const dayOfWeek = d.getDay()
         
+        // If this day is before tracking started, show 0
+        if (dateStr < startDateStr) {
+          result.push({
+            day: dayNames[dayOfWeek],
+            percentage: 0,
+            isToday: i === 0,
+            noData: true
+          })
+          continue
+        }
+        
         let completed = 0
         let total = 0
         
         habits.value.forEach(h => {
+          // Only count habits that existed on this date
+          if (h.createdAt && h.createdAt > dateStr) return
+          
           const activeDays = h.activeDays || [0, 1, 2, 3, 4, 5, 6]
           if (activeDays.includes(dayOfWeek)) {
             total++
@@ -413,6 +469,12 @@ createApp({
     const completionTrend = computed(() => {
       if (habits.value.length === 0) return 0
       
+      const daysSinceStart = getDaysSinceStart()
+      const startDateStr = getTrackingStartDate()
+      
+      // Need at least 2 days to calculate trend
+      if (daysSinceStart < 2) return 0
+      
       const getWeekAverage = (weeksAgo) => {
         let totalPercentage = 0
         let days = 0
@@ -422,12 +484,19 @@ createApp({
           const d = new Date(base)
           d.setDate(d.getDate() - (weeksAgo * 7) - i)
           const dateStr = getDateString(d)
+          
+          // Skip days before tracking started
+          if (dateStr < startDateStr) continue
+          
           const dayOfWeek = d.getDay()
           
           let completed = 0
           let total = 0
           
           habits.value.forEach(h => {
+            // Only count habits that existed on this date
+            if (h.createdAt && h.createdAt > dateStr) return
+            
             const activeDays = h.activeDays || [0, 1, 2, 3, 4, 5, 6]
             if (activeDays.includes(dayOfWeek)) {
               total++
@@ -450,26 +519,40 @@ createApp({
       const thisWeek = getWeekAverage(0)
       const lastWeek = getWeekAverage(1)
       
+      // If no data for last week, show 0 instead of misleading trend
+      if (lastWeek === 0 && thisWeek > 0) return 0
+      
       return Math.round(thisWeek - lastWeek)
     })
 
     const bestDayOfWeek = computed(() => {
       if (habits.value.length === 0) return '-'
       
+      const daysSinceStart = getDaysSinceStart()
+      const startDateStr = getTrackingStartDate()
+      const daysToCheck = Math.min(30, daysSinceStart)
+      
       const dayStats = [0, 0, 0, 0, 0, 0, 0]
       const dayCounts = [0, 0, 0, 0, 0, 0, 0]
       
       const base = new Date()
-      for (let i = 0; i < 30; i++) {
+      for (let i = 0; i < daysToCheck; i++) {
         const d = new Date(base)
         d.setDate(d.getDate() - i)
         const dateStr = getDateString(d)
+        
+        // Skip days before tracking started
+        if (dateStr < startDateStr) continue
+        
         const dayOfWeek = d.getDay()
         
         let completed = 0
         let total = 0
         
         habits.value.forEach(h => {
+          // Only count habits that existed on this date
+          if (h.createdAt && h.createdAt > dateStr) return
+          
           const activeDays = h.activeDays || [0, 1, 2, 3, 4, 5, 6]
           if (activeDays.includes(dayOfWeek)) {
             total++
@@ -497,26 +580,40 @@ createApp({
         }
       }
       
+      // If no data yet, show dash
+      if (bestAverage === 0) return '-'
+      
       return dayNamesFull[bestDay]
     })
 
     const averageCompletionRate = computed(() => {
       if (habits.value.length === 0) return 0
       
+      const daysSinceStart = getDaysSinceStart()
+      const startDateStr = getTrackingStartDate()
+      const daysToCheck = Math.min(30, daysSinceStart)
+      
       let totalPercentage = 0
       let days = 0
       const base = new Date()
       
-      for (let i = 0; i < 30; i++) {
+      for (let i = 0; i < daysToCheck; i++) {
         const d = new Date(base)
         d.setDate(d.getDate() - i)
         const dateStr = getDateString(d)
+        
+        // Skip days before tracking started
+        if (dateStr < startDateStr) continue
+        
         const dayOfWeek = d.getDay()
         
         let completed = 0
         let total = 0
         
         habits.value.forEach(h => {
+          // Only count habits that existed on this date
+          if (h.createdAt && h.createdAt > dateStr) return
+          
           const activeDays = h.activeDays || [0, 1, 2, 3, 4, 5, 6]
           if (activeDays.includes(dayOfWeek)) {
             total++
@@ -539,19 +636,30 @@ createApp({
     const perfectDays = computed(() => {
       if (habits.value.length === 0) return 0
       
+      const daysSinceStart = getDaysSinceStart()
+      const startDateStr = getTrackingStartDate()
+      const daysToCheck = Math.min(30, daysSinceStart)
+      
       let count = 0
       const base = new Date()
       
-      for (let i = 0; i < 30; i++) {
+      for (let i = 0; i < daysToCheck; i++) {
         const d = new Date(base)
         d.setDate(d.getDate() - i)
         const dateStr = getDateString(d)
+        
+        // Skip days before tracking started
+        if (dateStr < startDateStr) continue
+        
         const dayOfWeek = d.getDay()
         
         let completed = 0
         let total = 0
         
         habits.value.forEach(h => {
+          // Only count habits that existed on this date
+          if (h.createdAt && h.createdAt > dateStr) return
+          
           const activeDays = h.activeDays || [0, 1, 2, 3, 4, 5, 6]
           if (activeDays.includes(dayOfWeek)) {
             total++
@@ -571,6 +679,10 @@ createApp({
     })
 
     const categoryBreakdown = computed(() => {
+      const startDateStr = getTrackingStartDate()
+      const daysSinceStart = getDaysSinceStart()
+      const daysToCheck = Math.min(7, daysSinceStart)
+      
       return categories.value.map(cat => {
         const categoryHabits = habits.value.filter(h => h.categoryId === cat.id)
         
@@ -582,16 +694,23 @@ createApp({
         let count = 0
         const base = new Date()
         
-        for (let i = 0; i < 7; i++) {
+        for (let i = 0; i < daysToCheck; i++) {
           const d = new Date(base)
           d.setDate(d.getDate() - i)
           const dateStr = getDateString(d)
+          
+          // Skip days before tracking started
+          if (dateStr < startDateStr) continue
+          
           const dayOfWeek = d.getDay()
           
           let completed = 0
           let total = 0
           
           categoryHabits.forEach(h => {
+            // Only count habits that existed on this date
+            if (h.createdAt && h.createdAt > dateStr) return
+            
             const activeDays = h.activeDays || [0, 1, 2, 3, 4, 5, 6]
             if (activeDays.includes(dayOfWeek)) {
               total++
@@ -697,6 +816,12 @@ createApp({
       draggedIndex.value = index
       event.dataTransfer.effectAllowed = 'move'
       event.dataTransfer.setData('text/plain', index)
+      
+      // Add dragging class after a small delay for visual feedback
+      setTimeout(() => {
+        const habitEl = event.target.closest('.habit')
+        if (habitEl) habitEl.classList.add('dragging')
+      }, 0)
     }
 
     function onDragOver(event, index) {
@@ -715,19 +840,52 @@ createApp({
     function onDragEnd() {
       draggedHabit.value = null
       draggedIndex.value = null
+      
+      // Remove dragging class from all habits
+      document.querySelectorAll('.habit.dragging').forEach(el => {
+        el.classList.remove('dragging')
+      })
     }
+
+    // Touch drag requires holding for 200ms before activating
+    let touchHoldTimeout = null
+    let touchDragActivated = ref(false)
 
     function onTouchStart(event, index) {
       touchStartY.value = event.touches[0].clientY
       touchCurrentIndex.value = index
-      draggedHabit.value = filteredHabits.value[index]
-      draggedIndex.value = index
+      touchDragActivated.value = false
+      
+      // Start a timer - only activate drag after holding for 200ms
+      touchHoldTimeout = setTimeout(() => {
+        touchDragActivated.value = true
+        draggedHabit.value = filteredHabits.value[index]
+        draggedIndex.value = index
+        
+        // Add visual feedback
+        const habitEl = event.target.closest('.habit')
+        if (habitEl) {
+          habitEl.classList.add('dragging')
+          // Vibrate on mobile if supported
+          if (navigator.vibrate) navigator.vibrate(50)
+        }
+      }, 200)
     }
 
     function onTouchMove(event) {
-      if (draggedIndex.value === null) return
-
       const touchY = event.touches[0].clientY
+      const deltaY = Math.abs(touchY - touchStartY.value)
+      
+      // If user moved finger significantly before hold time, cancel drag (they're scrolling)
+      if (!touchDragActivated.value && deltaY > 10) {
+        clearTimeout(touchHoldTimeout)
+        touchHoldTimeout = null
+        return
+      }
+      
+      // Only reorder if drag was activated
+      if (!touchDragActivated.value || draggedIndex.value === null) return
+
       const habitElements = document.querySelectorAll('.habit')
       
       habitElements.forEach((el, index) => {
@@ -742,14 +900,29 @@ createApp({
           habits.value.splice(actualDraggedIndex, 1)
           habits.value.splice(actualTargetIndex, 0, draggedItem)
           draggedIndex.value = index
+          
+          // Vibrate on reorder
+          if (navigator.vibrate) navigator.vibrate(30)
         }
       })
     }
 
     function onTouchEnd() {
+      // Clear the hold timeout if it hasn't fired yet
+      if (touchHoldTimeout) {
+        clearTimeout(touchHoldTimeout)
+        touchHoldTimeout = null
+      }
+      
       draggedHabit.value = null
       draggedIndex.value = null
       touchCurrentIndex.value = null
+      touchDragActivated.value = false
+      
+      // Remove dragging class from all habits
+      document.querySelectorAll('.habit.dragging').forEach(el => {
+        el.classList.remove('dragging')
+      })
     }
 
     // ============================================
@@ -790,7 +963,8 @@ createApp({
         dailyGoal: dailyGoal.value,
         days: {},
         activeDays: [...selectedDays.value],
-        categoryId: selectedCategoryId.value
+        categoryId: selectedCategoryId.value,
+        createdAt: today()
       })
       
       showToast(`${newHabit.value} přidáno!`, '✨', 'success')
@@ -861,11 +1035,28 @@ createApp({
       const newCount = currentCount >= goal ? 0 : currentCount + 1
       habit.days[d] = newCount
 
+      // Trigger celebration animation when completing
+      if (newCount === goal) {
+        triggerCelebration(habit.id)
+      }
+
       if (newCount > 0) {
         nextTick(() => {
           generateCompletionToast(habit, newCount)
         })
       }
+    }
+
+    function triggerCelebration(habitId) {
+      if (celebrationTimeout) {
+        clearTimeout(celebrationTimeout)
+      }
+      
+      celebratingHabitId.value = habitId
+      
+      celebrationTimeout = setTimeout(() => {
+        celebratingHabitId.value = null
+      }, 800)
     }
 
     // ============================================
@@ -944,6 +1135,7 @@ createApp({
       selectedColor,
       draggedHabit,
       toast,
+      celebratingHabitId,
       
       // Constants
       dayNames,
@@ -967,6 +1159,8 @@ createApp({
       averageCompletionRate,
       perfectDays,
       categoryBreakdown,
+      trackingDaysForAverage,
+      trackingDaysForTrend,
       
       // Methods
       previousMonth,
